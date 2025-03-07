@@ -1,14 +1,11 @@
-use bevy::prelude::*;
-use rand::prelude::*;
-use noise::{NoiseFn, Perlin};
 use crate::components::terrain::*;
+use bevy::prelude::*;
+use noise::{NoiseFn, Perlin};
+use rand::prelude::*;
 
 const CELL_SIZE: i32 = 64;
 
-pub fn generate_world(
-    mut commands: Commands,
-    world_materials: Res<WorldMaterials>,
-) {
+pub fn generate_world(mut commands: Commands, world_materials: Res<WorldMaterials>) {
     // Initialise le générateur de bruit de Perlin pour la génération du terrain
     let terrain_noise = Perlin::new(random());
     let material_noise = Perlin::new(random());
@@ -21,22 +18,15 @@ pub fn generate_world(
     let mut occupied_cells = vec![vec![false; height as usize]; width as usize];
 
     // D'abord, génère les cellules du terrain (sans texture, juste la couleur mars)
-    for x in -width/2..width/2 {
-        for y in -height/2..height/2 {
+    for x in -width / 2..width / 2 {
+        for y in -height / 2..height / 2 {
             let (coord_x, coord_y) = calc_cell_coordinates(&x, &y);
-
+            let mut sprite = Sprite::from_color(MARS_GROUND_COLOR, Vec2::new(50.0, 50.0));
+            sprite.custom_size = Some(Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32));
+            
             // Spawn une cellule de terrain avec la couleur martienne
             commands.spawn((
-                /*SpriteBundle {
-                    sprite: Sprite {
-                        color: MARS_GROUND_COLOR,
-                        custom_size: Some(Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32)),
-                        ..default()
-                    },
-                    transform: Transform::from_xyz(coord_x as f32, coord_y as f32, 0.0),
-                    ..default()
-                },*/
-                Sprite::from_color(MARS_GROUND_COLOR, Vec2::new(50.0, 50.0)),
+                sprite,
                 Transform::from_xyz(coord_x as f32, coord_y as f32, 0.0),
                 TerrainCell { x, y },
             ));
@@ -44,8 +34,8 @@ pub fn generate_world(
     }
 
     // Ensuite, génère les objets solides (roches, basalte, olivine)
-    for x in -width/2..width/2 {
-        for y in -height/2..height/2 {
+    for x in -width / 2..width / 2 {
+        for y in -height / 2..height / 2 {
             let (coord_x, coord_y) = calc_cell_coordinates(&x, &y);
 
             // Utilise le bruit de Perlin pour déterminer s'il faut placer un objet
@@ -53,8 +43,8 @@ pub fn generate_world(
 
             // Détermine si on place un objet ici (50% des cellules ont des objets)
             if noise_value > 0.0 {
-                let grid_x = (x + width/2) as usize;
-                let grid_y = (y + height/2) as usize;
+                let grid_x = (x + width / 2) as usize;
+                let grid_y = (y + height / 2) as usize;
                 occupied_cells[grid_x][grid_y] = true;
 
                 // Détermine le type de matériau en fonction d'un autre bruit de Perlin
@@ -84,11 +74,6 @@ pub fn generate_world(
 
                 // Spawn l'objet solide
                 commands.spawn((
-                    /*SpriteBundle {
-                        texture: material_def.plain_texture.clone(), // Texture par défaut, sera mise à jour par le système
-                        transform: Transform::from_xyz(coord_x as f32, coord_y as f32, 1.0),
-                        ..default()
-                    },*/
                     Sprite::from_image(material_def.plain_texture.clone()),
                     Transform::from_xyz(coord_x as f32, coord_y as f32, 1.0),
                     SolidObject {
