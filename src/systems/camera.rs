@@ -11,6 +11,7 @@ pub struct ControlledCamera {
     pub pan_speed: f32,
     pub is_panning: bool,
     pub cursor_start_position: Vec2,
+    pub camera_start_position: Vec2,
 }
 
 pub fn init_camera(mut commands: Commands) {
@@ -23,6 +24,7 @@ pub fn init_camera(mut commands: Commands) {
             pan_speed: 1.0, // Augmenté pour un meilleur contrôle
             is_panning: false,
             cursor_start_position: Vec2::new(0.0, 0.0),
+            camera_start_position: Vec2::new(0.0, 0.0),
         },
     ));
 }
@@ -52,7 +54,13 @@ pub fn update_camera(
     // Gestion du déplacement avec le clic droit
     for event in mouse_button_input_events.read() {
         if event.button == MouseButton::Right {
-            camera.is_panning = event.state == ButtonState::Pressed;
+            if event.state == ButtonState::Pressed {
+                camera.is_panning = true;
+            } else {
+                camera.is_panning = false;
+                camera.cursor_start_position = Vec2::new(0.0, 0.0);
+                camera.camera_start_position = Vec2::new(0.0, 0.0);
+            }
         }
     }
 
@@ -63,13 +71,15 @@ pub fn update_camera(
         let cursor_position = window.cursor_position().unwrap() - window_size / 2.0;
         if camera.cursor_start_position == Vec2::new(0.0, 0.0) {
             camera.cursor_start_position = cursor_position;
+            camera.camera_start_position = Vec2::new(transform.translation.x, transform.translation.y);
         }
 
         // Appliquer le déplacement à la caméra
-        let new_position = (cursor_position - camera.cursor_start_position) / projection.scale;
+        let new_position = camera.camera_start_position
+            + (camera.cursor_start_position - cursor_position) * camera.pan_speed;
 
         // Appliquer le déplacement à la caméra
-        transform.translation.x = new_position.x * -1.0;
-        transform.translation.y = new_position.y;
+        transform.translation.x = new_position.x;
+        transform.translation.y = new_position.y * -1.0;
     }
 }
