@@ -1,5 +1,4 @@
 use bevy::prelude::{Component, Entity, Image};
-use crate::components::WorldEntity;
 
 #[derive(Component)]
 pub struct TerrainCell {
@@ -27,4 +26,11 @@ pub struct WorldMaterial {
     pub side_texture: Image,
     pub inter_corner_texture: Image,
     pub outer_corner_texture: Image,
+}
+
+#[derive(Component)]
+pub struct WorldEntity {
+    pub name: String,
+    pub icon: Image,
+    pub max_stack: i32,
 }
