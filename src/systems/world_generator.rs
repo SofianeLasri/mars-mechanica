@@ -3,28 +3,40 @@ use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::prelude::*;
 
-const CELL_SIZE: i32 = 64;
+pub const CELL_SIZE: i32 = 64;
 
 pub fn generate_world(mut commands: Commands, world_materials: Res<WorldMaterials>) {
-    // Initialise le générateur de bruit de Perlin pour la génération du terrain
     let terrain_noise = Perlin::new(random());
     let material_noise = Perlin::new(random());
 
-    // Dimensions de la carte
     let width = 50;
     let height = 50;
 
-    // Grille pour tracker les cellules occupées
     let mut occupied_cells = vec![vec![false; height as usize]; width as usize];
 
-    // D'abord, génère les cellules du terrain (sans texture, juste la couleur mars)
+    generate_cells(&mut commands, width, height);
+
+    generate_entities_and_world_materials(
+        &mut commands,
+        world_materials,
+        terrain_noise,
+        material_noise,
+        width,
+        height,
+        &mut occupied_cells,
+    );
+}
+
+/// Génère les cellules du terrain (sans texture, juste la couleur mars)
+fn generate_cells(commands: &mut Commands, width: i32, height: i32) {
     for x in -width / 2..width / 2 {
         for y in -height / 2..height / 2 {
             let (coord_x, coord_y) = calc_cell_coordinates(&x, &y);
-            let mut sprite = Sprite::from_color(MARS_GROUND_COLOR, Vec2::new(50.0, 50.0));
-            sprite.custom_size = Some(Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32));
-            
-            // Spawn une cellule de terrain avec la couleur martienne
+            let mut sprite = Sprite::from_color(
+                MARS_GROUND_COLOR,
+                Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32),
+            );
+
             commands.spawn((
                 sprite,
                 Transform::from_xyz(coord_x as f32, coord_y as f32, 0.0),
@@ -32,8 +44,18 @@ pub fn generate_world(mut commands: Commands, world_materials: Res<WorldMaterial
             ));
         }
     }
+}
 
-    // Ensuite, génère les objets solides (roches, basalte, olivine)
+/// Génère les objets solides (roches, basalte, olivine) et les matériaux du monde
+fn generate_entities_and_world_materials(
+    commands: &mut Commands,
+    world_materials: Res<WorldMaterials>,
+    terrain_noise: Perlin,
+    material_noise: Perlin,
+    width: i32,
+    height: i32,
+    occupied_cells: &mut Vec<Vec<bool>>,
+) {
     for x in -width / 2..width / 2 {
         for y in -height / 2..height / 2 {
             let (coord_x, coord_y) = calc_cell_coordinates(&x, &y);

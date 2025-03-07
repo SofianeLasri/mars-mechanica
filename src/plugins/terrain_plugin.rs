@@ -2,10 +2,9 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 use rand::Rng;
 use crate::components::{EntityDefinition, MaterialDefinition, SolidObject, WorldEntities, WorldMaterials, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT};
+use crate::systems::CELL_SIZE;
 
 pub struct TerrainPlugin;
-
-const CELL_SIZE: i32 = 64;
 
 impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
