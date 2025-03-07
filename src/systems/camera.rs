@@ -56,10 +56,10 @@ pub fn update_camera(
         if event.button == MouseButton::Right {
             if event.state == ButtonState::Pressed {
                 camera.is_panning = true;
+                // Réinitialisation pour enregistrer la position au premier frame du drag
+                camera.cursor_start_position = Vec2::new(0.0, 0.0);
             } else {
                 camera.is_panning = false;
-                camera.cursor_start_position = Vec2::new(0.0, 0.0);
-                camera.camera_start_position = Vec2::new(0.0, 0.0);
             }
         }
     }
@@ -68,18 +68,24 @@ pub fn update_camera(
     if camera.is_panning {
         let window = window_query.single();
         let window_size = Vec2::new(window.width(), window.height());
-        let cursor_position = window.cursor_position().unwrap() - window_size / 2.0;
+        let cursor_position = window.cursor_position().unwrap_or(window_size / 2.0) - window_size / 2.0;
+
         if camera.cursor_start_position == Vec2::new(0.0, 0.0) {
+            // Enregistrer la position initiale du curseur et de la caméra
             camera.cursor_start_position = cursor_position;
+            // Stocker la position actuelle (sans inverser Y à nouveau)
             camera.camera_start_position = Vec2::new(transform.translation.x, transform.translation.y);
         }
 
-        // Appliquer le déplacement à la caméra
-        let new_position = camera.camera_start_position
-            + (camera.cursor_start_position - cursor_position) * camera.pan_speed;
+        // Calculer le déplacement
+        let delta = (camera.cursor_start_position - cursor_position) * camera.pan_speed;
+        let new_position = Vec2::new(
+            camera.camera_start_position.x + delta.x,
+            camera.camera_start_position.y - delta.y  // Inverser le delta Y pour un mouvement intuitif
+        );
 
         // Appliquer le déplacement à la caméra
         transform.translation.x = new_position.x;
-        transform.translation.y = new_position.y * -1.0;
+        transform.translation.y = new_position.y;
     }
 }
