@@ -1,4 +1,4 @@
-use bevy::prelude::{Component, Entity};
+use bevy::prelude::{Component, Entity, Image};
 use crate::components::WorldEntity;
 
 #[derive(Component)]
@@ -22,4 +22,9 @@ pub struct WorldMaterial {
     pub entity: WorldEntity,
     pub drop_count_min: i32,
     pub drop_count_max: i32,
+    pub can_be_merged: bool,
+    pub plain_texture: Image,
+    pub side_texture: Image,
+    pub inter_corner_texture: Image,
+    pub outer_corner_texture: Image,
 }

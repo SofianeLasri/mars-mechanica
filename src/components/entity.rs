@@ -8,5 +8,5 @@ pub struct Position {
 
 #[derive(Component)]
 pub struct WorldEntity {
-    pub entity: Entity,
+    pub entity: String,
 }
