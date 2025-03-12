@@ -12,8 +12,8 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(EntityPlugin)
         .add_plugins(TerrainPlugin)
-        .add_systems(Startup, (init_camera, debug_text, generate_world))
-        .add_systems(Update, (update_debug_text, update_camera))
+        .add_systems(Startup, (init_camera, generate_world))
+        .add_systems(Update, (update_camera))
         .run();
 }
 

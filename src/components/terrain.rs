@@ -37,6 +37,13 @@ pub struct WorldEntities {
     pub entities: HashMap<String, EntityDefinition>,
 }
 
+// --- ÉVÉNEMENTS ---
+
+#[derive(Event)]
+pub struct UpdateTerrainEvent {
+    pub region: Option<(Vec2, Vec2)>,
+}
+
 // --- DÉFINITIONS ---
 
 #[derive(Clone)]

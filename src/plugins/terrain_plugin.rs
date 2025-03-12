@@ -1,8 +1,12 @@
-use bevy::prelude::*;
-use std::collections::HashMap;
-use rand::Rng;
-use crate::components::{EntityDefinition, MaterialDefinition, SolidObject, WorldEntities, WorldMaterials, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT};
+use crate::components::{
+    EntityDefinition, MaterialDefinition, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT,
+    NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT,
+    NEIGHBOR_TOP_RIGHT, SolidObject, UpdateTerrainEvent, WorldEntities, WorldMaterials,
+};
 use crate::systems::CELL_SIZE;
+use bevy::prelude::*;
+use rand::Rng;
+use std::collections::HashMap;
 
 pub struct TerrainPlugin;
 
@@ -10,14 +14,23 @@ impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WorldMaterials>()
             .init_resource::<WorldEntities>()
+            .add_event::<UpdateTerrainEvent>()
             .add_systems(PreStartup, init_world_definitions)
+            .add_systems(
+                PostStartup,
+                (
+                    update_neighbors_pattern,
+                    update_material_textures,
+                    update_sprite_rotations,
+                ),
+            )
             .add_systems(
                 Update,
                 (
                     update_solid_objects,
-                    update_neighbors_pattern,
-                    update_material_textures,
-                    update_sprite_rotations,
+                    update_neighbors_pattern.run_if(on_event::<UpdateTerrainEvent>),
+                    update_material_textures.run_if(on_event::<UpdateTerrainEvent>),
+                    update_sprite_rotations.run_if(on_event::<UpdateTerrainEvent>),
                 ),
             );
     }
@@ -152,7 +165,11 @@ fn update_solid_objects(
 // Système pour mettre à jour les motifs de voisinage de chaque objet solide
 fn update_neighbors_pattern(
     mut solid_objects_query: Query<(Entity, &mut SolidObject, &Transform)>,
+    mut event_reader: EventReader<UpdateTerrainEvent>,
 ) {
+    info!("Update neighbors pattern");
+    let region_to_update = event_reader.read().next().and_then(|event| event.region);
+
     // Collecte d'abord toutes les positions et matériaux pour une recherche efficace
     let positions: Vec<(i32, i32, Entity, String)> = solid_objects_query
         .iter()
@@ -171,49 +188,70 @@ fn update_neighbors_pattern(
 
         let x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
         let y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
+
+        // Check si l'objet est dans la région à mettre à jour
+        if let Some((min, max)) = region_to_update {
+            let pos = Vec2::new(x as f32 * CELL_SIZE as f32, y as f32 * CELL_SIZE as f32);
+            if pos.x < min.x || pos.x > max.x || pos.y < min.y || pos.y > max.y {
+                continue;
+            }
+        }
+
         let material_id = &solid_object.material_id;
 
         let mut pattern: u8 = 0;
 
         // Vérification des 8 directions pour les voisins
         // Droite
-        if positions.iter().any(|(px, py, e, mat)|
-            *px == x + 1 && *py == y && *e != entity && mat == material_id) {
+        if positions
+            .iter()
+            .any(|(px, py, e, mat)| *px == x + 1 && *py == y && *e != entity && mat == material_id)
+        {
             pattern |= NEIGHBOR_RIGHT;
         }
         // Haut-Droite
-        if positions.iter().any(|(px, py, e, mat)|
-            *px == x + 1 && *py == y + 1 && *e != entity && mat == material_id) {
+        if positions.iter().any(|(px, py, e, mat)| {
+            *px == x + 1 && *py == y + 1 && *e != entity && mat == material_id
+        }) {
             pattern |= NEIGHBOR_TOP_RIGHT;
         }
         // Haut
-        if positions.iter().any(|(px, py, e, mat)|
-            *px == x && *py == y + 1 && *e != entity && mat == material_id) {
+        if positions
+            .iter()
+            .any(|(px, py, e, mat)| *px == x && *py == y + 1 && *e != entity && mat == material_id)
+        {
             pattern |= NEIGHBOR_TOP;
         }
         // Haut-Gauche
-        if positions.iter().any(|(px, py, e, mat)|
-            *px == x - 1 && *py == y + 1 && *e != entity && mat == material_id) {
+        if positions.iter().any(|(px, py, e, mat)| {
+            *px == x - 1 && *py == y + 1 && *e != entity && mat == material_id
+        }) {
             pattern |= NEIGHBOR_TOP_LEFT;
         }
         // Gauche
-        if positions.iter().any(|(px, py, e, mat)|
-            *px == x - 1 && *py == y && *e != entity && mat == material_id) {
+        if positions
+            .iter()
+            .any(|(px, py, e, mat)| *px == x - 1 && *py == y && *e != entity && mat == material_id)
+        {
             pattern |= NEIGHBOR_LEFT;
         }
         // Bas-Gauche
-        if positions.iter().any(|(px, py, e, mat)|
-            *px == x - 1 && *py == y - 1 && *e != entity && mat == material_id) {
+        if positions.iter().any(|(px, py, e, mat)| {
+            *px == x - 1 && *py == y - 1 && *e != entity && mat == material_id
+        }) {
             pattern |= NEIGHBOR_BOTTOM_LEFT;
         }
         // Bas
-        if positions.iter().any(|(px, py, e, mat)|
-            *px == x && *py == y - 1 && *e != entity && mat == material_id) {
+        if positions
+            .iter()
+            .any(|(px, py, e, mat)| *px == x && *py == y - 1 && *e != entity && mat == material_id)
+        {
             pattern |= NEIGHBOR_BOTTOM;
         }
         // Bas-Droite
-        if positions.iter().any(|(px, py, e, mat)|
-            *px == x + 1 && *py == y - 1 && *e != entity && mat == material_id) {
+        if positions.iter().any(|(px, py, e, mat)| {
+            *px == x + 1 && *py == y - 1 && *e != entity && mat == material_id
+        }) {
             pattern |= NEIGHBOR_BOTTOM_RIGHT;
         }
 
@@ -309,4 +347,13 @@ fn update_sprite_rotations(mut query: Query<(&SolidObject, &mut Transform), Chan
             }
         }
     }
+}
+
+pub fn trigger_terrain_update(mut event_writer: EventWriter<UpdateTerrainEvent>) {
+    event_writer.send(UpdateTerrainEvent { region: None });
+
+    // Ou pour une zone spécifique:
+    // event_writer.send(UpdateTerrainEvent {
+    //     region: Some((Vec2::new(x1, y1), Vec2::new(x2, y2)))
+    // });
 }

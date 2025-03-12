@@ -5,7 +5,11 @@ use rand::prelude::*;
 
 pub const CELL_SIZE: i32 = 64;
 
-pub fn generate_world(mut commands: Commands, world_materials: Res<WorldMaterials>) {
+pub fn generate_world(
+    mut commands: Commands,
+    world_materials: Res<WorldMaterials>,
+    mut event_writer: EventWriter<UpdateTerrainEvent>
+) {
     let terrain_noise = Perlin::new(random());
     let material_noise = Perlin::new(random());
 
@@ -31,6 +35,10 @@ pub fn generate_world(mut commands: Commands, world_materials: Res<WorldMaterial
     );
 
     info!("Entities generated");
+    // En fait on envoie pas l'événement ici car à ce stade, le système de rendu n'est pas encore prêt
+    // Il faut le faire en post startup
+    // NOTE : Si on ne le fait pas ici, ça ne fonctionne pas. Apparement faut le faire dans les 2...
+    event_writer.send(UpdateTerrainEvent { region: None });
 }
 
 /// Génère les cellules du terrain (sans texture, juste la couleur mars)
