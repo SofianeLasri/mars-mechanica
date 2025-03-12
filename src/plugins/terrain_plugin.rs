@@ -10,7 +10,7 @@ impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WorldMaterials>()
             .init_resource::<WorldEntities>()
-            .add_systems(Startup, init_world_definitions)
+            .add_systems(PreStartup, init_world_definitions)
             .add_systems(
                 Update,
                 (
@@ -23,7 +23,8 @@ impl Plugin for TerrainPlugin {
     }
 }
 
-// Initialise les définitions des matériaux et entités
+/// Initialise les définitions des matériaux et entités.
+/// Doit être exécuté avant tout autre système, dans la phase PreStartup !
 fn init_world_definitions(
     mut world_materials: ResMut<WorldMaterials>,
     mut world_entities: ResMut<WorldEntities>,

@@ -14,7 +14,11 @@ pub fn generate_world(mut commands: Commands, world_materials: Res<WorldMaterial
 
     let mut occupied_cells = vec![vec![false; height as usize]; width as usize];
 
+    info!("Generating world...");
+
     generate_cells(&mut commands, width, height);
+
+    info!("Empty cells generated");
 
     generate_entities_and_world_materials(
         &mut commands,
@@ -25,6 +29,8 @@ pub fn generate_world(mut commands: Commands, world_materials: Res<WorldMaterial
         height,
         &mut occupied_cells,
     );
+
+    info!("Entities generated");
 }
 
 /// Génère les cellules du terrain (sans texture, juste la couleur mars)
@@ -82,6 +88,10 @@ fn generate_entities_and_world_materials(
                     // Roche martienne (60% de chance)
                     "rock"
                 };
+
+                if (world_materials.materials.len() == 0) {
+                    error!("No materials in the world materials");
+                }
 
                 let material_def = world_materials.materials.get(material_id).unwrap();
                 let mergeable = material_def.can_be_merged;
