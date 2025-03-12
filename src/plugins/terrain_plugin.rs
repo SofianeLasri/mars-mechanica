@@ -119,10 +119,10 @@ fn init_world_definitions(
     world_entities.entities = entities;
 }
 
-// Système pour mettre à jour les objets solides (détruire si health = 0)
+/// Système pour mettre à jour les objets solides (détruire si health = 0)
 fn update_solid_objects(
     mut commands: Commands,
-    mut solid_objects: Query<(Entity, &SolidObject)>,
+    solid_objects: Query<(Entity, &SolidObject)>,
     world_materials: Res<WorldMaterials>,
     world_entities: Res<WorldEntities>,
 ) {
@@ -233,7 +233,7 @@ fn has_neighbor_at(
         .any(|(_, pos, obj)| pos.0 == x && pos.1 == y && obj.material_id == material_id)
 }
 
-// Système pour mettre à jour les textures des matériaux en fonction des voisins
+/// Système pour mettre à jour les textures des matériaux en fonction des voisins
 fn update_material_textures(
     mut commands: Commands,
     solid_objects: Query<(Entity, &SolidObject), Changed<SolidObject>>,
@@ -241,13 +241,13 @@ fn update_material_textures(
 ) {
     for (entity, solid_object) in solid_objects.iter() {
         if let Some(texture) = solid_object.get_texture(&world_materials) {
-            // Met à jour la texture de l'entité
-            //commands.entity(entity).insert(texture);
+            // L'ancien sprite est remplacé par le nouveau
+            commands.entity(entity).insert(Sprite::from_image(texture));
         }
     }
 }
 
-// Système pour gérer les rotations de sprite en fonction du pattern de voisinage
+/// Système pour gérer les rotations de sprite en fonction du pattern de voisinage
 fn update_sprite_rotations(mut query: Query<(&SolidObject, &mut Transform), Changed<SolidObject>>) {
     for (solid_object, mut transform) in query.iter_mut() {
         // Si l'objet n'est pas fusionnable, garde sa rotation par défaut
