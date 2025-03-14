@@ -25,6 +25,7 @@ pub fn hover_detection(
 
     //let cursor_world_position = camera_transform.translation().truncate() + cursor_position;
     // Y is inverted
+    // TODO: Gérer le dézoom de la caméra
     let cursor_world_position = Vec2::new(
         camera_transform.translation().x + cursor_position.x,
         camera_transform.translation().y - cursor_position.y,
@@ -60,7 +61,8 @@ pub fn hover_detection(
         if cursor_world_position.x >= block_min.x && cursor_world_position.x <= block_max.x &&
             cursor_world_position.y >= block_min.y && cursor_world_position.y <= block_max.y {
             // Debug Hover Text
-            *writer.text(text_query.single_mut(), 0) = format!("Hovered cell: ({:.1}, {:.1})", transform.translation.x, transform.translation.y);
+            let cell_position = Vec2::new(transform.translation.x / CELL_SIZE as f32, transform.translation.y / CELL_SIZE as f32);
+            *writer.text(text_query.single_mut(), 0) = format!("Hovered cell: ({:.1}, {:.1})", cell_position.x, cell_position.y);
 
             // Bloc survolé, appliquer l'effet visuel (overlay gris clair)
             //sprite.color = Color::rgba(1.0, 1.0, 1.0, 0.0);
