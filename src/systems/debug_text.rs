@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 
 #[derive(Component)]
-pub struct DebugText;
+pub struct DebugCameraText;
+
+#[derive(Component)]
+pub struct DebugHoverText;
 
 pub fn debug_text(
     mut commands: Commands,
@@ -20,12 +23,28 @@ pub fn debug_text(
             left: Val::Px(5.0),
             ..default()
         },
-        DebugText,
+        DebugCameraText,
+    ));
+    
+    commands.spawn((
+        Text::new("Hovered cell: None"),
+        TextFont {
+            font: asset_server.load("fonts/inter-regular.ttf"),
+            font_size: 18.0,
+            ..default()
+        },
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(30.0),
+            left: Val::Px(5.0),
+            ..default()
+        },
+        DebugHoverText,
     ));
 }
 
-pub fn update_debug_text(
-    mut text_query: Query<Entity, With<DebugText>>,
+pub fn update_debug_camera_text(
+    mut text_query: Query<Entity, With<DebugCameraText>>,
     window_query: Query<&Window>,
     mut writer: TextUiWriter,
 ) {

@@ -112,9 +112,12 @@ fn generate_entities_and_world_materials(
                     _ => 1.0,
                 };
 
+                let mut sprite = Sprite::from_image(material_def.plain_texture.clone());
+                sprite.custom_size = Some(Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32));
+
                 // Spawn l'objet solide
                 commands.spawn((
-                    Sprite::from_image(material_def.plain_texture.clone()),
+                    sprite,
                     Transform::from_xyz(coord_x as f32, coord_y as f32, 1.0),
                     SolidObject {
                         material_id: material_id.to_string(),

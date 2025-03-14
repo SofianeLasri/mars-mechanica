@@ -280,7 +280,9 @@ fn update_material_textures(
     for (entity, solid_object) in solid_objects.iter() {
         if let Some(texture) = solid_object.get_texture(&world_materials) {
             // L'ancien sprite est remplacé par le nouveau
-            commands.entity(entity).insert(Sprite::from_image(texture));
+            let mut sprite = Sprite::from_image(texture);
+            sprite.custom_size = Some(Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32));
+            commands.entity(entity).insert(sprite);
         }
     }
 }

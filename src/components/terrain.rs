@@ -25,6 +25,11 @@ pub struct WorldEntityItem {
     pub quantity: i32,
 }
 
+#[derive(Component)]
+pub struct HoverState {
+    pub hovered: bool,
+}
+
 // --- RESSOURCES ---
 
 #[derive(Resource)]
