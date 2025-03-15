@@ -2,21 +2,23 @@ mod components;
 mod plugins;
 mod systems;
 
-use crate::plugins::{DebugTextPlugin, EntityPlugin, InteractionPlugin, TerrainPlugin};
-use crate::systems::{generate_world, init_camera, update_camera};
+use crate::plugins::{
+    CameraPlugin, DebugTextPlugin, EntityPlugin, InteractionPlugin, TerrainPlugin,
+};
+use crate::systems::generate_world;
+use bevy::prelude::{App, Startup};
 use bevy::DefaultPlugins;
-use bevy::prelude::{App, FixedUpdate, Startup};
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins((
             EntityPlugin,
+            CameraPlugin,
             TerrainPlugin,
             DebugTextPlugin,
             InteractionPlugin,
         ))
-        .add_systems(Startup, (init_camera, generate_world))
-        .add_systems(FixedUpdate, update_camera)
+        .add_systems(Startup, generate_world)
         .run();
 }
