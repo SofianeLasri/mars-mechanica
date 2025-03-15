@@ -42,8 +42,6 @@ pub fn hover_detection(
         With<SolidObject>,
     >,
     mut interaction_sprite_query: Query<Entity, With<InteractionSprite>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-    world_materials: Res<WorldMaterials>,
     mut text_query: Query<Entity, With<DebugHoverText>>,
     mut writer: TextUiWriter,
 ) {
@@ -67,13 +65,6 @@ pub fn hover_detection(
     // Réinitialiser tous les états de survol
     for (entity, _, mut sprite, hover_state, solid_object) in solid_objects_query.iter_mut() {
         if hover_state.is_some() && hover_state.unwrap().hovered {
-            /*if let Some(texture) = solid_object.get_texture(&world_materials) {
-                let mut sprite = Sprite::from_image(texture);
-                sprite.custom_size = Some(VEC2_CELL_SIZE);
-                commands.entity(entity).insert(sprite);
-            }*/
-
-            // Supprimer le composant HoverState
             commands.entity(entity).remove::<HoverState>();
         }
     }
@@ -109,13 +100,7 @@ pub fn hover_detection(
                 "Hovered cell: ({:.1}, {:.1})",
                 cell_position.x, cell_position.y
             );
-
-            // Bloc survolé, appliquer l'effet visuel (overlay gris clair)
-            //sprite.color = Color::rgba(1.0, 1.0, 1.0, 0.0);
-            /*commands.entity(entity).insert(Sprite::from_color(
-                Color::WHITE,
-                VEC2_CELL_SIZE,
-            ));*/
+            
             // On défini la position du sprite d'interaction sur le bloc survolé
             commands.entity(interaction_sprite).insert(Transform::from_xyz(
                 transform.translation.x,
