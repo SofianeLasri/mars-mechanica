@@ -3,7 +3,7 @@ use crate::components::{
     NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT,
     NEIGHBOR_TOP_RIGHT, SolidObject, UpdateTerrainEvent, WorldEntities, WorldMaterials,
 };
-use crate::systems::CELL_SIZE;
+use crate::systems::{CELL_SIZE, VEC2_CELL_SIZE};
 use bevy::prelude::*;
 use rand::Rng;
 use std::collections::HashMap;
@@ -281,7 +281,7 @@ fn update_material_textures(
         if let Some(texture) = solid_object.get_texture(&world_materials) {
             // L'ancien sprite est remplacé par le nouveau
             let mut sprite = Sprite::from_image(texture);
-            sprite.custom_size = Some(Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32));
+            sprite.custom_size = Some(VEC2_CELL_SIZE);
             commands.entity(entity).insert(sprite);
         }
     }

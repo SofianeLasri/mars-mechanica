@@ -4,6 +4,7 @@ use noise::{NoiseFn, Perlin};
 use rand::prelude::*;
 
 pub const CELL_SIZE: i32 = 64;
+pub const VEC2_CELL_SIZE: Vec2 = Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32);
 
 pub fn generate_world(
     mut commands: Commands,
@@ -48,7 +49,7 @@ fn generate_cells(commands: &mut Commands, width: i32, height: i32) {
             let (coord_x, coord_y) = calc_cell_coordinates(&x, &y);
             let mut sprite = Sprite::from_color(
                 MARS_GROUND_COLOR,
-                Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32),
+                VEC2_CELL_SIZE,
             );
 
             commands.spawn((
@@ -113,7 +114,7 @@ fn generate_entities_and_world_materials(
                 };
 
                 let mut sprite = Sprite::from_image(material_def.plain_texture.clone());
-                sprite.custom_size = Some(Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32));
+                sprite.custom_size = Some(VEC2_CELL_SIZE);
 
                 // Spawn l'objet solide
                 commands.spawn((

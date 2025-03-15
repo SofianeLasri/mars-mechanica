@@ -1,6 +1,6 @@
 use crate::components::{HoverState, SolidObject, UpdateTerrainEvent, WorldMaterials};
 use crate::plugins::debug_text::DebugHoverText;
-use crate::systems::CELL_SIZE;
+use crate::systems::{CELL_SIZE, VEC2_CELL_SIZE};
 use bevy::input::ButtonState;
 use bevy::input::mouse::{MouseButtonInput, MouseMotion};
 use bevy::prelude::*;
@@ -8,11 +8,22 @@ use bevy::window::PrimaryWindow;
 
 pub struct InteractionPlugin;
 
+#[derive(Component)]
+pub struct InteractionSprite;
+
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(FixedUpdate, hover_detection)
-            .add_systems(FixedUpdate, block_click_handler);
+        app.add_systems(Startup, init)
+            .add_systems(FixedUpdate, (hover_detection,block_click_handler));
     }
+}
+
+pub fn init(mut commands: Commands) {
+    // We'll create a new entity with a sprite component that will be shown when the mouse is hovering over a world cell
+    // For now, no need to set the sprite's position, it will be set in the hover_detection system
+    let semi_transparent_white = Color::srgba(1.0, 1.0, 1.0, 0.5);
+    let sprite = Sprite::from_color(semi_transparent_white, VEC2_CELL_SIZE);
+    commands.spawn((sprite, InteractionSprite));
 }
 
 // Système pour détecter le survol des blocs et appliquer un effet visuel
@@ -55,7 +66,7 @@ pub fn hover_detection(
         if hover_state.is_some() && hover_state.unwrap().hovered {
             if let Some(texture) = solid_object.get_texture(&world_materials) {
                 let mut sprite = Sprite::from_image(texture);
-                sprite.custom_size = Some(Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32));
+                sprite.custom_size = Some(VEC2_CELL_SIZE);
                 commands.entity(entity).insert(sprite);
             }
 
@@ -68,7 +79,7 @@ pub fn hover_detection(
     for (entity, transform, mut sprite, hover_state, solid_object) in solid_objects_query.iter_mut()
     {
         // Vérifier si la position de la souris est dans le bloc
-        let block_size = Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32); // Utiliser CELL_SIZE
+        let block_size = VEC2_CELL_SIZE;
         let block_min = Vec2::new(
             transform.translation.x - block_size.x / 2.0,
             transform.translation.y - block_size.y / 2.0,
@@ -97,7 +108,7 @@ pub fn hover_detection(
             //sprite.color = Color::rgba(1.0, 1.0, 1.0, 0.0);
             commands.entity(entity).insert(Sprite::from_color(
                 Color::WHITE,
-                Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32),
+                VEC2_CELL_SIZE,
             ));
 
             // Ajouter ou mettre à jour le composant HoverState

@@ -11,11 +11,11 @@ pub struct DebugTextPlugin;
 impl Plugin for DebugTextPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Startup, debug_text)
+            .add_systems(Startup, init)
             .add_systems(FixedUpdate, update_debug_camera_text);
     }
 }
-pub fn debug_text(
+pub fn init(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {

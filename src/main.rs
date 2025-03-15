@@ -17,6 +17,6 @@ fn main() {
             InteractionPlugin,
         ))
         .add_systems(Startup, (init_camera, generate_world))
-        .add_systems(FixedUpdate, (update_camera))
+        .add_systems(FixedUpdate, update_camera)
         .run();
 }
