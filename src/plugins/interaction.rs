@@ -1,21 +1,39 @@
-use bevy::prelude::*;
-use crate::components::{SolidObject, HoverState, UpdateTerrainEvent, WorldMaterials};
-use bevy::input::mouse::{MouseButtonInput, MouseMotion};
-use bevy::input::ButtonState;
-use bevy::window::PrimaryWindow;
+use crate::components::{HoverState, SolidObject, UpdateTerrainEvent, WorldMaterials};
 use crate::plugins::debug_text::DebugHoverText;
-use crate::systems::{CELL_SIZE};
+use crate::systems::CELL_SIZE;
+use bevy::input::ButtonState;
+use bevy::input::mouse::{MouseButtonInput, MouseMotion};
+use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
+
+pub struct InteractionPlugin;
+
+impl Plugin for InteractionPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(FixedUpdate, hover_detection)
+            .add_systems(FixedUpdate, block_click_handler);
+    }
+}
 
 // Système pour détecter le survol des blocs et appliquer un effet visuel
 pub fn hover_detection(
     mut commands: Commands,
     window_query: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
-    mut solid_objects_query: Query<(Entity, &Transform, &mut Sprite, Option<&HoverState>, &SolidObject), With<SolidObject>>,
+    mut solid_objects_query: Query<
+        (
+            Entity,
+            &Transform,
+            &mut Sprite,
+            Option<&HoverState>,
+            &SolidObject,
+        ),
+        With<SolidObject>,
+    >,
     mut materials: ResMut<Assets<ColorMaterial>>,
     world_materials: Res<WorldMaterials>,
     mut text_query: Query<Entity, With<DebugHoverText>>,
-    mut writer: TextUiWriter
+    mut writer: TextUiWriter,
 ) {
     // Récupérer la position de la souris
     let window = window_query.single();
@@ -47,7 +65,8 @@ pub fn hover_detection(
     }
 
     // Détecter quels blocs sont sous la souris
-    for (entity, transform, mut sprite, hover_state, solid_object) in solid_objects_query.iter_mut() {
+    for (entity, transform, mut sprite, hover_state, solid_object) in solid_objects_query.iter_mut()
+    {
         // Vérifier si la position de la souris est dans le bloc
         let block_size = Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32); // Utiliser CELL_SIZE
         let block_min = Vec2::new(
@@ -59,15 +78,27 @@ pub fn hover_detection(
             transform.translation.y + block_size.y / 2.0,
         );
 
-        if cursor_world_position.x >= block_min.x && cursor_world_position.x <= block_max.x &&
-            cursor_world_position.y >= block_min.y && cursor_world_position.y <= block_max.y {
+        if cursor_world_position.x >= block_min.x
+            && cursor_world_position.x <= block_max.x
+            && cursor_world_position.y >= block_min.y
+            && cursor_world_position.y <= block_max.y
+        {
             // Debug Hover Text
-            let cell_position = Vec2::new(transform.translation.x / CELL_SIZE as f32, transform.translation.y / CELL_SIZE as f32);
-            *writer.text(text_query.single_mut(), 0) = format!("Hovered cell: ({:.1}, {:.1})", cell_position.x, cell_position.y);
+            let cell_position = Vec2::new(
+                transform.translation.x / CELL_SIZE as f32,
+                transform.translation.y / CELL_SIZE as f32,
+            );
+            *writer.text(text_query.single_mut(), 0) = format!(
+                "Hovered cell: ({:.1}, {:.1})",
+                cell_position.x, cell_position.y
+            );
 
             // Bloc survolé, appliquer l'effet visuel (overlay gris clair)
             //sprite.color = Color::rgba(1.0, 1.0, 1.0, 0.0);
-            commands.entity(entity).insert(Sprite::from_color(Color::WHITE, Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32)));
+            commands.entity(entity).insert(Sprite::from_color(
+                Color::WHITE,
+                Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32),
+            ));
 
             // Ajouter ou mettre à jour le composant HoverState
             if hover_state.is_none() || !hover_state.unwrap().hovered {
@@ -96,7 +127,7 @@ pub fn block_click_handler(
 
                         // Déclencher une mise à jour du terrain
                         update_terrain_events.send(UpdateTerrainEvent {
-                            region: None // Mettre à jour tout le terrain
+                            region: None, // Mettre à jour tout le terrain
                         });
 
                         break; // Ne détruire qu'un seul bloc par clic
