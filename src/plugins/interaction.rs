@@ -1,7 +1,6 @@
-use crate::components::{HoverState, SolidObject, UpdateTerrainEvent};
+use crate::components::{HoverState, SolidObject, UpdateTerrainEvent, CELL_SIZE, VEC2_CELL_SIZE};
 use crate::plugins::camera::get_cursor_world_position;
 use crate::plugins::debug_text::DebugHoverText;
-use crate::systems::{CELL_SIZE, VEC2_CELL_SIZE};
 use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
 use bevy::prelude::*;

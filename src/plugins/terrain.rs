@@ -1,9 +1,9 @@
 use crate::components::{
-    EntityDefinition, MaterialDefinition, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT,
-    NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT,
-    NEIGHBOR_TOP_RIGHT, SolidObject, UpdateTerrainEvent, WorldEntities, WorldMaterials,
+    EntityDefinition, MaterialDefinition, SolidObject, UpdateTerrainEvent, WorldEntities,
+    WorldMaterials, CELL_SIZE, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT,
+    NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT,
+    VEC2_CELL_SIZE,
 };
-use crate::systems::{CELL_SIZE, VEC2_CELL_SIZE};
 use bevy::prelude::*;
 use rand::Rng;
 use std::collections::HashMap;

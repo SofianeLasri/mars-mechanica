@@ -3,10 +3,6 @@ use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::prelude::*;
 
-pub const MAP_SIZE: i32 = 50;
-pub const CELL_SIZE: i32 = 64;
-pub const VEC2_CELL_SIZE: Vec2 = Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32);
-
 pub fn generate_world(
     mut commands: Commands,
     world_materials: Res<WorldMaterials>,
@@ -45,7 +41,7 @@ fn generate_cells(commands: &mut Commands, width: i32, height: i32) {
     for x in -width / 2..width / 2 {
         for y in -height / 2..height / 2 {
             let (coord_x, coord_y) = calc_cell_coordinates(&x, &y);
-            let mut sprite = Sprite::from_color(
+            let sprite = Sprite::from_color(
                 MARS_GROUND_COLOR,
                 VEC2_CELL_SIZE,
             );
@@ -96,7 +92,7 @@ fn generate_entities_and_world_materials(
                     "rock"
                 };
 
-                if (world_materials.materials.len() == 0) {
+                if world_materials.materials.len() == 0 {
                     error!("No materials in the world materials");
                 }
 

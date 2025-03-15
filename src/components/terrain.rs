@@ -30,6 +30,12 @@ pub struct HoverState {
     pub hovered: bool,
 }
 
+#[derive(Component)]
+pub struct TerrainChunk {
+    pub chunk_x: i32,
+    pub chunk_y: i32,
+}
+
 // --- RESSOURCES ---
 
 #[derive(Resource)]
@@ -93,6 +99,11 @@ pub const NEIGHBOR_LEFT: u8 = 0b00010000;
 pub const NEIGHBOR_BOTTOM_LEFT: u8 = 0b00100000;
 pub const NEIGHBOR_BOTTOM: u8 = 0b01000000;
 pub const NEIGHBOR_BOTTOM_RIGHT: u8 = 0b10000000;
+
+pub const CHUNK_SIZE: i32 = 16;
+pub const MAP_SIZE: i32 = 50;
+pub const CELL_SIZE: i32 = 64;
+pub const VEC2_CELL_SIZE: Vec2 = Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32);
 
 // Implémentation par défaut pour les ressources
 impl Default for WorldMaterials {
