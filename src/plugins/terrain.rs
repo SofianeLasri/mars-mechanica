@@ -1,12 +1,12 @@
 use crate::components::{
-    EntityDefinition, MaterialDefinition, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT,
-    NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT,
-    NEIGHBOR_TOP_RIGHT, SolidObject, UpdateTerrainEvent, WorldEntities, WorldMaterials,
+    ChunkMap, ChunkUtils, EntityDefinition, MaterialDefinition, SolidObject, UpdateTerrainEvent,
+    WorldEntities, WorldMaterials, CELL_SIZE, CHUNK_SIZE, NEIGHBOR_BOTTOM,
+    NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP,
+    NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE,
 };
-use crate::systems::{CELL_SIZE, VEC2_CELL_SIZE};
 use bevy::prelude::*;
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub struct TerrainPlugin;
 
@@ -14,6 +14,7 @@ impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WorldMaterials>()
             .init_resource::<WorldEntities>()
+            .init_resource::<ChunkMap>()
             .add_event::<UpdateTerrainEvent>()
             .add_systems(PreStartup, init_world_definitions)
             .add_systems(
@@ -135,11 +136,12 @@ fn init_world_definitions(
 /// Système pour mettre à jour les objets solides (détruire si health = 0)
 fn update_solid_objects(
     mut commands: Commands,
-    solid_objects: Query<(Entity, &SolidObject)>,
+    solid_objects: Query<(Entity, &SolidObject, &Transform)>,
     world_materials: Res<WorldMaterials>,
     world_entities: Res<WorldEntities>,
+    mut chunk_map: ResMut<ChunkMap>,
 ) {
-    for (entity, solid_object) in solid_objects.iter() {
+    for (entity, solid_object, transform) in solid_objects.iter() {
         if solid_object.health <= 0.0 {
             // Logique pour faire apparaître des items lorsqu'un objet est détruit
             if let Some(material) = world_materials.materials.get(&solid_object.material_id) {
@@ -157,22 +159,45 @@ fn update_solid_objects(
                 }
             }
 
+            // Supprimer l'entité du chunk map
+            let x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
+            let y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
+            let (chunk_x, chunk_y) = ChunkUtils::world_to_chunk_coords(x, y);
+
+            if let Some(entities) = chunk_map.chunks.get_mut(&(chunk_x, chunk_y)) {
+                entities.remove(&entity);
+            }
+
             commands.entity(entity).despawn();
         }
     }
 }
 
-// Système pour mettre à jour les motifs de voisinage de chaque objet solide
+/// This method updates the neighbors pattern for all solid objects
 fn update_neighbors_pattern(
     mut solid_objects_query: Query<(Entity, &mut SolidObject, &Transform)>,
     mut event_reader: EventReader<UpdateTerrainEvent>,
+    chunk_map: Res<ChunkMap>,
 ) {
     info!("Update neighbors pattern");
-    let region_to_update = event_reader.read().next().and_then(|event| event.region);
 
-    // Collecte d'abord toutes les positions et matériaux pour une recherche efficace
+    let chunks_to_update = find_chunks_to_update(&mut event_reader, &chunk_map);
+
+    if chunks_to_update.is_empty() {
+        return;
+    }
+
+    let mut entities_to_update: HashSet<Entity> = HashSet::new();
+    for chunk_coords in &chunks_to_update {
+        info!("Updating chunk {:?}", chunk_coords);
+        if let Some(entities) = chunk_map.chunks.get(chunk_coords) {
+            entities_to_update.extend(entities);
+        }
+    }
+
     let positions: Vec<(i32, i32, Entity, String)> = solid_objects_query
         .iter()
+        .filter(|(entity, _, _)| chunks_to_update.is_empty() || entities_to_update.contains(entity))
         .map(|(entity, solid_object, transform)| {
             let x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
             let y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
@@ -180,95 +205,124 @@ fn update_neighbors_pattern(
         })
         .collect();
 
-    // Met à jour chaque objet avec son motif de voisinage
     for (entity, mut solid_object, transform) in solid_objects_query.iter_mut() {
         if !solid_object.mergeable {
-            continue; // Skip les objets non fusionnables
+            continue;
         }
 
         let x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
         let y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
+        let (chunk_x, chunk_y) = ChunkUtils::world_to_chunk_coords(x, y);
 
-        // Check si l'objet est dans la région à mettre à jour
-        if let Some((min, max)) = region_to_update {
-            let pos = Vec2::new(x as f32 * CELL_SIZE as f32, y as f32 * CELL_SIZE as f32);
-            if pos.x < min.x || pos.x > max.x || pos.y < min.y || pos.y > max.y {
-                continue;
-            }
+        if !chunks_to_update.is_empty() && !chunks_to_update.contains(&(chunk_x, chunk_y)) {
+            continue;
         }
 
         let material_id = &solid_object.material_id;
 
-        let mut pattern: u8 = 0;
-
-        // Vérification des 8 directions pour les voisins
-        // Droite
-        if positions
-            .iter()
-            .any(|(px, py, e, mat)| *px == x + 1 && *py == y && *e != entity && mat == material_id)
-        {
-            pattern |= NEIGHBOR_RIGHT;
-        }
-        // Haut-Droite
-        if positions.iter().any(|(px, py, e, mat)| {
-            *px == x + 1 && *py == y + 1 && *e != entity && mat == material_id
-        }) {
-            pattern |= NEIGHBOR_TOP_RIGHT;
-        }
-        // Haut
-        if positions
-            .iter()
-            .any(|(px, py, e, mat)| *px == x && *py == y + 1 && *e != entity && mat == material_id)
-        {
-            pattern |= NEIGHBOR_TOP;
-        }
-        // Haut-Gauche
-        if positions.iter().any(|(px, py, e, mat)| {
-            *px == x - 1 && *py == y + 1 && *e != entity && mat == material_id
-        }) {
-            pattern |= NEIGHBOR_TOP_LEFT;
-        }
-        // Gauche
-        if positions
-            .iter()
-            .any(|(px, py, e, mat)| *px == x - 1 && *py == y && *e != entity && mat == material_id)
-        {
-            pattern |= NEIGHBOR_LEFT;
-        }
-        // Bas-Gauche
-        if positions.iter().any(|(px, py, e, mat)| {
-            *px == x - 1 && *py == y - 1 && *e != entity && mat == material_id
-        }) {
-            pattern |= NEIGHBOR_BOTTOM_LEFT;
-        }
-        // Bas
-        if positions
-            .iter()
-            .any(|(px, py, e, mat)| *px == x && *py == y - 1 && *e != entity && mat == material_id)
-        {
-            pattern |= NEIGHBOR_BOTTOM;
-        }
-        // Bas-Droite
-        if positions.iter().any(|(px, py, e, mat)| {
-            *px == x + 1 && *py == y - 1 && *e != entity && mat == material_id
-        }) {
-            pattern |= NEIGHBOR_BOTTOM_RIGHT;
-        }
+        let pattern = get_neighbors_pattern(&positions, entity, x, y, material_id);
 
         solid_object.neighbors_pattern = pattern;
     }
+    info!("Neighbors pattern updated");
 }
 
-// Vérifie s'il y a un voisin à une position donnée avec le même matériau
-fn has_neighbor_at(
-    positions: &[(Entity, (i32, i32), &SolidObject)],
-    x: i32,
-    y: i32,
-    material_id: &str,
-) -> bool {
-    positions
+/// This method returns the pattern of neighbors for a given bloc/Entity at position (x, y).
+///
+/// It takes care of checking the 8 directions for neighbors and returns a u8 pattern.
+///
+/// It also checks if the neighbors are of the same material.
+fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: Entity, x: i32, y: i32, material_id: &String) -> u8 {
+    let mut pattern: u8 = 0;
+
+    // Vérification des 8 directions pour les voisins
+    // Droite
+    if positions
         .iter()
-        .any(|(_, pos, obj)| pos.0 == x && pos.1 == y && obj.material_id == material_id)
+        .any(|(px, py, e, mat)| *px == x + 1 && *py == y && *e != entity && mat == material_id)
+    {
+        pattern |= NEIGHBOR_RIGHT;
+    }
+    // Haut-Droite
+    if positions.iter().any(|(px, py, e, mat)| {
+        *px == x + 1 && *py == y + 1 && *e != entity && mat == material_id
+    }) {
+        pattern |= NEIGHBOR_TOP_RIGHT;
+    }
+    // Haut
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x && *py == y + 1 && *e != entity && mat == material_id)
+    {
+        pattern |= NEIGHBOR_TOP;
+    }
+    // Haut-Gauche
+    if positions.iter().any(|(px, py, e, mat)| {
+        *px == x - 1 && *py == y + 1 && *e != entity && mat == material_id
+    }) {
+        pattern |= NEIGHBOR_TOP_LEFT;
+    }
+    // Gauche
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x - 1 && *py == y && *e != entity && mat == material_id)
+    {
+        pattern |= NEIGHBOR_LEFT;
+    }
+    // Bas-Gauche
+    if positions.iter().any(|(px, py, e, mat)| {
+        *px == x - 1 && *py == y - 1 && *e != entity && mat == material_id
+    }) {
+        pattern |= NEIGHBOR_BOTTOM_LEFT;
+    }
+    // Bas
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x && *py == y - 1 && *e != entity && mat == material_id)
+    {
+        pattern |= NEIGHBOR_BOTTOM;
+    }
+    // Bas-Droite
+    if positions.iter().any(|(px, py, e, mat)| {
+        *px == x + 1 && *py == y - 1 && *e != entity && mat == material_id
+    }) {
+        pattern |= NEIGHBOR_BOTTOM_RIGHT;
+    }
+    pattern
+}
+
+/// This method finds the chunks to update based on the given event
+fn find_chunks_to_update(event_reader: &mut EventReader<UpdateTerrainEvent>, chunk_map: &Res<ChunkMap>) -> HashSet<(i32, i32)> {
+    let mut chunks_to_update = HashSet::new();
+
+    for event in event_reader.read() {
+        if let Some(chunk_coords) = event.chunk_coords {
+            info!("Update chunk {:?}", chunk_coords);
+            for neighbor_chunk in ChunkUtils::get_neighbor_chunks(chunk_coords.0, chunk_coords.1) {
+                chunks_to_update.insert(neighbor_chunk);
+            }
+        } else if let Some(region) = event.region {
+            let min_x = (region.0.x / (CHUNK_SIZE * CELL_SIZE) as f32).floor() as i32;
+            let min_y = (region.0.y / (CHUNK_SIZE * CELL_SIZE) as f32).floor() as i32;
+            let max_x = (region.1.x / (CHUNK_SIZE * CELL_SIZE) as f32).ceil() as i32;
+            let max_y = (region.1.y / (CHUNK_SIZE * CELL_SIZE) as f32).ceil() as i32;
+
+            info!("Update region: ({}, {}) to ({}, {})", min_x, min_y, max_x, max_y);
+            for chunk_x in min_x..=max_x {
+                for chunk_y in min_y..=max_y {
+                    for neighbor_chunk in ChunkUtils::get_neighbor_chunks(chunk_x, chunk_y) {
+                        chunks_to_update.insert(neighbor_chunk);
+                    }
+                }
+            }
+        } else {
+            info!("Update all chunks");
+            for &chunk_coords in chunk_map.chunks.keys() {
+                chunks_to_update.insert(chunk_coords);
+            }
+        }
+    }
+    chunks_to_update
 }
 
 /// Système pour mettre à jour les textures des matériaux en fonction des voisins
@@ -351,11 +405,13 @@ fn update_sprite_rotations(mut query: Query<(&SolidObject, &mut Transform), Chan
     }
 }
 
-pub fn trigger_terrain_update(mut event_writer: EventWriter<UpdateTerrainEvent>) {
-    event_writer.send(UpdateTerrainEvent { region: None });
-
-    // Ou pour une zone spécifique:
-    // event_writer.send(UpdateTerrainEvent {
-    //     region: Some((Vec2::new(x1, y1), Vec2::new(x2, y2)))
-    // });
+pub fn trigger_terrain_update(
+    chunk_x: i32,
+    chunk_y: i32,
+    mut event_writer: EventWriter<UpdateTerrainEvent>,
+) {
+    event_writer.send(UpdateTerrainEvent {
+        region: None,
+        chunk_coords: Some((chunk_x, chunk_y)),
+    });
 }

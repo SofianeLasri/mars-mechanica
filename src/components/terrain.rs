@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // --- COMPOSANTS ---
 
@@ -7,6 +7,12 @@ use std::collections::HashMap;
 pub struct TerrainCell {
     pub x: i32,
     pub y: i32,
+}
+
+#[derive(Component)]
+pub struct TerrainChunk {
+    pub chunk_x: i32,
+    pub chunk_y: i32,
 }
 
 #[derive(Component)]
@@ -42,11 +48,17 @@ pub struct WorldEntities {
     pub entities: HashMap<String, EntityDefinition>,
 }
 
+#[derive(Resource)]
+pub struct ChunkMap {
+    pub chunks: HashMap<(i32, i32), HashSet<Entity>>,
+}
+
 // --- ÉVÉNEMENTS ---
 
 #[derive(Event)]
 pub struct UpdateTerrainEvent {
     pub region: Option<(Vec2, Vec2)>,
+    pub chunk_coords: Option<(i32, i32)>,
 }
 
 // --- DÉFINITIONS ---
@@ -75,7 +87,21 @@ pub struct EntityDefinition {
 
 // --- CONSTANTES ---
 
-// Couleur du sol martien
+/// Number of blocks in each chunk.
+///
+/// 16 seems to be a good value for performance.
+pub const CHUNK_SIZE: i32 = 16;
+/// Chunks count in each direction.
+///
+/// Example: 8 = 8x16 = 128 blocks in each direction
+///
+/// **NOTE:** Any value above 8 will cause an exponential performance drop
+pub const MAP_SIZE: i32 = 8;
+
+/// Size of each block in pixels with 100% OS scaling.
+pub const CELL_SIZE: i32 = 64;
+pub const VEC2_CELL_SIZE: Vec2 = Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32);
+
 pub const MARS_GROUND_COLOR: Color = Color::srgb(
     192.0 / 255.0,
     122.0 / 255.0,
@@ -107,6 +133,14 @@ impl Default for WorldEntities {
     fn default() -> Self {
         Self {
             entities: HashMap::new(),
+        }
+    }
+}
+
+impl Default for ChunkMap {
+    fn default() -> Self {
+        Self {
+            chunks: HashMap::new(),
         }
     }
 }
@@ -168,5 +202,38 @@ impl SolidObject {
             pattern == NEIGHBOR_TOP ||
             pattern == NEIGHBOR_LEFT ||
             pattern == NEIGHBOR_BOTTOM
+    }
+}
+
+pub struct ChunkUtils;
+
+impl ChunkUtils {
+    /// Convert world coordinates to chunk coordinates
+    pub fn world_to_chunk_coords(x: i32, y: i32) -> (i32, i32) {
+        /// Usage of euclidean division to handle negative numbers correctly
+        let chunk_x = if x < 0 && x % CHUNK_SIZE != 0 {
+            (x / CHUNK_SIZE) - 1
+        } else {
+            x / CHUNK_SIZE
+        };
+
+        let chunk_y = if y < 0 && y % CHUNK_SIZE != 0 {
+            (y / CHUNK_SIZE) - 1
+        } else {
+            y / CHUNK_SIZE
+        };
+
+        (chunk_x, chunk_y)
+    }
+
+    /// Returns all neighbor chunks (including the chunk itself)
+    pub fn get_neighbor_chunks(chunk_x: i32, chunk_y: i32) -> Vec<(i32, i32)> {
+        let mut neighbors = Vec::with_capacity(9);
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                neighbors.push((chunk_x + dx, chunk_y + dy));
+            }
+        }
+        neighbors
     }
 }
