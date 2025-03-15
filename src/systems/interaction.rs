@@ -3,7 +3,8 @@ use crate::components::{SolidObject, HoverState, UpdateTerrainEvent, WorldMateri
 use bevy::input::mouse::{MouseButtonInput, MouseMotion};
 use bevy::input::ButtonState;
 use bevy::window::PrimaryWindow;
-use crate::systems::{DebugCameraText, DebugHoverText, CELL_SIZE};
+use crate::plugins::debug_text::DebugHoverText;
+use crate::systems::{CELL_SIZE};
 
 // Système pour détecter le survol des blocs et appliquer un effet visuel
 pub fn hover_detection(

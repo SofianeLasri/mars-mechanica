@@ -25,7 +25,7 @@ impl Plugin for TerrainPlugin {
                 ),
             )
             .add_systems(
-                Update,
+                FixedUpdate,
                 (
                     update_solid_objects,
                     update_neighbors_pattern.run_if(on_event::<UpdateTerrainEvent>),
