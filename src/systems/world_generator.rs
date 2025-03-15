@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::prelude::*;
 
+pub const MAP_SIZE: i32 = 50;
 pub const CELL_SIZE: i32 = 64;
 pub const VEC2_CELL_SIZE: Vec2 = Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32);
 
@@ -14,14 +15,11 @@ pub fn generate_world(
     let terrain_noise = Perlin::new(random());
     let material_noise = Perlin::new(random());
 
-    let width = 50;
-    let height = 50;
-
-    let mut occupied_cells = vec![vec![false; height as usize]; width as usize];
+    let mut occupied_cells = vec![vec![false; MAP_SIZE as usize]; MAP_SIZE as usize];
 
     info!("Generating world...");
 
-    generate_cells(&mut commands, width, height);
+    generate_cells(&mut commands, MAP_SIZE, MAP_SIZE);
 
     info!("Empty cells generated");
 
@@ -30,8 +28,8 @@ pub fn generate_world(
         world_materials,
         terrain_noise,
         material_noise,
-        width,
-        height,
+        MAP_SIZE,
+        MAP_SIZE,
         &mut occupied_cells,
     );
 
