@@ -1,9 +1,9 @@
-pub mod entity_plugin;
-pub mod terrain_plugin;
+pub mod entity;
+pub mod terrain;
 pub mod debug_text;
 
-pub use entity_plugin::EntityPlugin;
+pub use entity::EntityPlugin;
 
-pub use terrain_plugin::*;
+pub use terrain::*;
 
 pub use debug_text::DebugTextPlugin;
