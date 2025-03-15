@@ -68,7 +68,7 @@ pub fn hover_detection(
             commands.entity(entity).remove::<HoverState>();
         }
     }
-    
+
     let mut block_hovered = false;
 
     // Détecter quels blocs sont sous la souris
@@ -100,7 +100,7 @@ pub fn hover_detection(
                 "Hovered cell: ({:.1}, {:.1})",
                 cell_position.x, cell_position.y
             );
-            
+
             // On défini la position du sprite d'interaction sur le bloc survolé
             commands.entity(interaction_sprite).insert(Transform::from_xyz(
                 transform.translation.x,
@@ -114,7 +114,7 @@ pub fn hover_detection(
             }
         }
     }
-    
+
     // Si aucun bloc n'est survolé, cacher le sprite d'interaction
     if !block_hovered {
         commands.entity(interaction_sprite).insert(Transform::from_xyz(
