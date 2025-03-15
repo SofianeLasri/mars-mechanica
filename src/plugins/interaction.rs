@@ -41,6 +41,7 @@ pub fn hover_detection(
         ),
         With<SolidObject>,
     >,
+    mut interaction_sprite_query: Query<Entity, With<InteractionSprite>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     world_materials: Res<WorldMaterials>,
     mut text_query: Query<Entity, With<DebugHoverText>>,
@@ -61,19 +62,23 @@ pub fn hover_detection(
         camera_transform.translation().y - cursor_position.y,
     );
 
+    let mut interaction_sprite = interaction_sprite_query.single_mut();
+
     // Réinitialiser tous les états de survol
     for (entity, _, mut sprite, hover_state, solid_object) in solid_objects_query.iter_mut() {
         if hover_state.is_some() && hover_state.unwrap().hovered {
-            if let Some(texture) = solid_object.get_texture(&world_materials) {
+            /*if let Some(texture) = solid_object.get_texture(&world_materials) {
                 let mut sprite = Sprite::from_image(texture);
                 sprite.custom_size = Some(VEC2_CELL_SIZE);
                 commands.entity(entity).insert(sprite);
-            }
+            }*/
 
             // Supprimer le composant HoverState
             commands.entity(entity).remove::<HoverState>();
         }
     }
+    
+    let mut block_hovered = false;
 
     // Détecter quels blocs sont sous la souris
     for (entity, transform, mut sprite, hover_state, solid_object) in solid_objects_query.iter_mut()
@@ -94,6 +99,7 @@ pub fn hover_detection(
             && cursor_world_position.y >= block_min.y
             && cursor_world_position.y <= block_max.y
         {
+            block_hovered = true;
             // Debug Hover Text
             let cell_position = Vec2::new(
                 transform.translation.x / CELL_SIZE as f32,
@@ -106,9 +112,15 @@ pub fn hover_detection(
 
             // Bloc survolé, appliquer l'effet visuel (overlay gris clair)
             //sprite.color = Color::rgba(1.0, 1.0, 1.0, 0.0);
-            commands.entity(entity).insert(Sprite::from_color(
+            /*commands.entity(entity).insert(Sprite::from_color(
                 Color::WHITE,
                 VEC2_CELL_SIZE,
+            ));*/
+            // On défini la position du sprite d'interaction sur le bloc survolé
+            commands.entity(interaction_sprite).insert(Transform::from_xyz(
+                transform.translation.x,
+                transform.translation.y,
+                100.0, // Z-index plus élevé que les blocs
             ));
 
             // Ajouter ou mettre à jour le composant HoverState
@@ -116,6 +128,12 @@ pub fn hover_detection(
                 commands.entity(entity).insert(HoverState { hovered: true });
             }
         }
+    }
+    
+    // Si aucun bloc n'est survolé, cacher le sprite d'interaction
+    if !block_hovered {
+        commands.entity(interaction_sprite).remove::<Transform>();
+        *writer.text(text_query.single_mut(), 0) = "Hovered cell: None".to_string();
     }
 }
 
