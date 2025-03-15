@@ -2,46 +2,66 @@ use crate::components::terrain::*;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::prelude::*;
+use std::collections::HashSet;
 
 pub fn generate_world(
     mut commands: Commands,
     world_materials: Res<WorldMaterials>,
+    mut chunk_map: ResMut<ChunkMap>,
     mut event_writer: EventWriter<UpdateTerrainEvent>
 ) {
     let terrain_noise = Perlin::new(random());
     let material_noise = Perlin::new(random());
 
-    let mut occupied_cells = vec![vec![false; MAP_SIZE as usize]; MAP_SIZE as usize];
-
     info!("Generating world...");
 
-    generate_cells(&mut commands, MAP_SIZE, MAP_SIZE);
+    // Générer le monde chunk par chunk
+    for chunk_x in -MAP_SIZE / 2..MAP_SIZE / 2 {
+        for chunk_y in -MAP_SIZE / 2..MAP_SIZE / 2 {
+            generate_chunk(
+                &mut commands,
+                &mut chunk_map,
+                world_materials.as_ref(),
+                terrain_noise,
+                material_noise,
+                chunk_x,
+                chunk_y,
+            );
+        }
+    }
 
-    info!("Empty cells generated");
+    info!("World generated! Chunks: {}", chunk_map.chunks.len());
 
-    generate_entities_and_world_materials(
-        &mut commands,
-        world_materials,
-        terrain_noise,
-        material_noise,
-        MAP_SIZE,
-        MAP_SIZE,
-        &mut occupied_cells,
-    );
-
-    info!("Entities generated");
-    // En fait on envoie pas l'événement ici car à ce stade, le système de rendu n'est pas encore prêt
-    // Il faut le faire en post startup
-    // NOTE : Si on ne le fait pas ici, ça ne fonctionne pas. Apparement faut le faire dans les 2...
-    event_writer.send(UpdateTerrainEvent { region: None });
+    // Envoyer l'événement de mise à jour du terrain
+    event_writer.send(UpdateTerrainEvent {
+        region: None,
+        chunk_coords: None,
+    });
 }
 
-/// Génère les cellules du terrain (sans texture, juste la couleur mars)
-fn generate_cells(commands: &mut Commands, width: i32, height: i32) {
-    for x in -width / 2..width / 2 {
-        for y in -height / 2..height / 2 {
-            let (coord_x, coord_y) = calc_cell_coordinates(&x, &y);
-            let sprite = Sprite::from_color(
+/// Génère un chunk du terrain avec ses cellules et objets solides
+fn generate_chunk(
+    commands: &mut Commands,
+    chunk_map: &mut ChunkMap,
+    world_materials: &WorldMaterials,
+    terrain_noise: Perlin,
+    material_noise: Perlin,
+    chunk_x: i32,
+    chunk_y: i32,
+) {
+    // Créer une entrée pour ce chunk dans la ChunkMap
+    chunk_map.chunks.insert((chunk_x, chunk_y), HashSet::new());
+
+    // Générer les cellules du chunk
+    for local_x in 0..CHUNK_SIZE {
+        for local_y in 0..CHUNK_SIZE {
+            let world_x = chunk_x * CHUNK_SIZE + local_x;
+            let world_y = chunk_y * CHUNK_SIZE + local_y;
+
+            let (coord_x, coord_y) = calc_cell_coordinates(&world_x, &world_y);
+
+            // Générer la cellule du terrain (sol martien)
+            let mut sprite = Sprite::from_color(
                 MARS_GROUND_COLOR,
                 VEC2_CELL_SIZE,
             );
@@ -49,37 +69,17 @@ fn generate_cells(commands: &mut Commands, width: i32, height: i32) {
             commands.spawn((
                 sprite,
                 Transform::from_xyz(coord_x as f32, coord_y as f32, 0.0),
-                TerrainCell { x, y },
+                TerrainCell { x: world_x, y: world_y },
+                TerrainChunk { chunk_x, chunk_y },
             ));
-        }
-    }
-}
 
-/// Génère les objets solides (roches, basalte, olivine) et les matériaux du monde
-fn generate_entities_and_world_materials(
-    commands: &mut Commands,
-    world_materials: Res<WorldMaterials>,
-    terrain_noise: Perlin,
-    material_noise: Perlin,
-    width: i32,
-    height: i32,
-    occupied_cells: &mut Vec<Vec<bool>>,
-) {
-    for x in -width / 2..width / 2 {
-        for y in -height / 2..height / 2 {
-            let (coord_x, coord_y) = calc_cell_coordinates(&x, &y);
-
-            // Utilise le bruit de Perlin pour déterminer s'il faut placer un objet
-            let noise_value = terrain_noise.get([x as f64 * 0.1, y as f64 * 0.1]) as f32;
+            // Utilise le bruit de Perlin pour déterminer s'il faut placer un objet solide
+            let noise_value = terrain_noise.get([world_x as f64 * 0.1, world_y as f64 * 0.1]) as f32;
 
             // Détermine si on place un objet ici (50% des cellules ont des objets)
             if noise_value > 0.0 {
-                let grid_x = (x + width / 2) as usize;
-                let grid_y = (y + height / 2) as usize;
-                occupied_cells[grid_x][grid_y] = true;
-
                 // Détermine le type de matériau en fonction d'un autre bruit de Perlin
-                let material_value = material_noise.get([x as f64 * 0.2, y as f64 * 0.2]) as f32;
+                let material_value = material_noise.get([world_x as f64 * 0.2, world_y as f64 * 0.2]) as f32;
 
                 let material_id = if material_value > 0.7 {
                     // Olivine (10% de chance)
@@ -94,6 +94,7 @@ fn generate_entities_and_world_materials(
 
                 if world_materials.materials.len() == 0 {
                     error!("No materials in the world materials");
+                    continue;
                 }
 
                 let material_def = world_materials.materials.get(material_id).unwrap();
@@ -111,7 +112,7 @@ fn generate_entities_and_world_materials(
                 sprite.custom_size = Some(VEC2_CELL_SIZE);
 
                 // Spawn l'objet solide
-                commands.spawn((
+                let entity = commands.spawn((
                     sprite,
                     Transform::from_xyz(coord_x as f32, coord_y as f32, 1.0),
                     SolidObject {
@@ -121,7 +122,13 @@ fn generate_entities_and_world_materials(
                         mergeable,
                         neighbors_pattern: 0, // Sera mis à jour par le système update_neighbors_pattern
                     },
-                ));
+                    TerrainChunk { chunk_x, chunk_y },
+                )).id();
+
+                // Ajouter l'entité à la map de chunks
+                if let Some(chunk_entities) = chunk_map.chunks.get_mut(&(chunk_x, chunk_y)) {
+                    chunk_entities.insert(entity);
+                }
             }
         }
     }
