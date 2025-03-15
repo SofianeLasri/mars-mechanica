@@ -132,7 +132,11 @@ pub fn hover_detection(
     
     // Si aucun bloc n'est survolé, cacher le sprite d'interaction
     if !block_hovered {
-        commands.entity(interaction_sprite).remove::<Transform>();
+        commands.entity(interaction_sprite).insert(Transform::from_xyz(
+            0.0,
+            0.0,
+            -100.0, // Z-index plus bas que les blocs
+        ));
         *writer.text(text_query.single_mut(), 0) = "Hovered cell: None".to_string();
     }
 }
