@@ -18,8 +18,8 @@ pub fn init(mut commands: Commands) {
         Camera2d,
         ControlledCamera {
             zoom_speed: 0.1,
-            min_zoom: 0.5,
-            max_zoom: 3.0,
+            min_zoom: 0.75, // Max zoom (+)
+            max_zoom: 4.0, // Max dezoom (-)
             pan_speed: 1.0,
             is_panning: false,
             cursor_start_position: Vec2::new(0.0, 0.0),
