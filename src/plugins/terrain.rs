@@ -1,8 +1,8 @@
 use crate::components::{
-    ChunkMap, ChunkUtils, EntityDefinition, MaterialDefinition, SolidObject, UpdateTerrainEvent,
-    WorldEntities, WorldMaterials, CELL_SIZE, CHUNK_SIZE, NEIGHBOR_BOTTOM,
-    NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP,
-    NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE,
+    ChunkMap, ChunkUtils, EntityDefinition, MaskOverlay, MaterialDefinition, SolidObject, UpdateTerrainEvent,
+    WorldEntities, WorldMaterials, CELL_SIZE, CHUNK_SIZE,
+    MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT,
+    NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE,
 };
 use bevy::prelude::*;
 use rand::Rng;
@@ -19,10 +19,7 @@ impl Plugin for TerrainPlugin {
             .add_systems(PreStartup, init_world_definitions)
             .add_systems(
                 PostStartup,
-                (
-                    update_neighbors_pattern,
-                    update_material_textures
-                ),
+                (update_neighbors_pattern, update_material_textures),
             )
             .add_systems(
                 FixedUpdate,
@@ -88,7 +85,7 @@ fn init_world_definitions(
             drop_count_min: 1,
             drop_count_max: 1,
             can_be_merged: false, // Apparaît toujours comme des cristaux individuels
-            rarity: 0.7, // Très rare
+            rarity: 0.7,          // Très rare
             sprites: load_material_sprites(&asset_server, "olivine"),
             color: Color::srgb(33.0 / 255.0, 72.0 / 255.0, 40.0 / 255.0), // #214828
         },
@@ -133,14 +130,29 @@ fn init_world_definitions(
 }
 
 /// This method loads the material sprites from the asset server
-fn load_material_sprites(asset_server: &Res<AssetServer>, material_id: &str) -> HashMap<String, Handle<Image>> {
+fn load_material_sprites(
+    asset_server: &Res<AssetServer>,
+    material_id: &str,
+) -> HashMap<String, Handle<Image>> {
     let mut sprites: HashMap<String, Handle<Image>> = HashMap::new();
 
     let sprite_names = [
-        "alone", "bottom-right", "bottom", "left-bottom-right",
-        "left-bottom", "left-right", "top-left", "left",
-        "right", "top-bottom-right", "top-bottom", "top-left-bottom-right",
-        "top-left-bottom", "top-left-right", "top-right", "top"
+        "alone",
+        "bottom-right",
+        "bottom",
+        "left-bottom-right",
+        "left-bottom",
+        "left-right",
+        "top-left",
+        "left",
+        "right",
+        "top-bottom-right",
+        "top-bottom",
+        "top-left-bottom-right",
+        "top-left-bottom",
+        "top-left-right",
+        "top-right",
+        "top",
     ];
 
     for name in sprite_names.iter() {
@@ -251,7 +263,13 @@ fn update_neighbors_pattern(
 /// It takes care of checking the 8 directions for neighbors and returns a u8 pattern.
 ///
 /// It also checks if the neighbors are of the same material.
-fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: Entity, x: i32, y: i32, material_id: &String) -> u8 {
+fn get_neighbors_pattern(
+    positions: &Vec<(i32, i32, Entity, String)>,
+    entity: Entity,
+    x: i32,
+    y: i32,
+    material_id: &String,
+) -> u8 {
     let mut pattern: u8 = 0;
 
     // Vérification des 8 directions pour les voisins
@@ -263,9 +281,10 @@ fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: En
         pattern |= NEIGHBOR_RIGHT;
     }
     // Haut-Droite
-    if positions.iter().any(|(px, py, e, mat)| {
-        *px == x + 1 && *py == y + 1 && *e != entity && mat == material_id
-    }) {
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x + 1 && *py == y + 1 && *e != entity && mat == material_id)
+    {
         pattern |= NEIGHBOR_TOP_RIGHT;
     }
     // Haut
@@ -276,9 +295,10 @@ fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: En
         pattern |= NEIGHBOR_TOP;
     }
     // Haut-Gauche
-    if positions.iter().any(|(px, py, e, mat)| {
-        *px == x - 1 && *py == y + 1 && *e != entity && mat == material_id
-    }) {
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x - 1 && *py == y + 1 && *e != entity && mat == material_id)
+    {
         pattern |= NEIGHBOR_TOP_LEFT;
     }
     // Gauche
@@ -289,9 +309,10 @@ fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: En
         pattern |= NEIGHBOR_LEFT;
     }
     // Bas-Gauche
-    if positions.iter().any(|(px, py, e, mat)| {
-        *px == x - 1 && *py == y - 1 && *e != entity && mat == material_id
-    }) {
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x - 1 && *py == y - 1 && *e != entity && mat == material_id)
+    {
         pattern |= NEIGHBOR_BOTTOM_LEFT;
     }
     // Bas
@@ -302,16 +323,20 @@ fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: En
         pattern |= NEIGHBOR_BOTTOM;
     }
     // Bas-Droite
-    if positions.iter().any(|(px, py, e, mat)| {
-        *px == x + 1 && *py == y - 1 && *e != entity && mat == material_id
-    }) {
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x + 1 && *py == y - 1 && *e != entity && mat == material_id)
+    {
         pattern |= NEIGHBOR_BOTTOM_RIGHT;
     }
     pattern
 }
 
 /// This method finds the chunks to update based on the given event
-fn find_chunks_to_update(event_reader: &mut EventReader<UpdateTerrainEvent>, chunk_map: &Res<ChunkMap>) -> HashSet<(i32, i32)> {
+fn find_chunks_to_update(
+    event_reader: &mut EventReader<UpdateTerrainEvent>,
+    chunk_map: &Res<ChunkMap>,
+) -> HashSet<(i32, i32)> {
     let mut chunks_to_update = HashSet::new();
 
     for event in event_reader.read() {
@@ -326,7 +351,10 @@ fn find_chunks_to_update(event_reader: &mut EventReader<UpdateTerrainEvent>, chu
             let max_x = (region.1.x / (CHUNK_SIZE * CELL_SIZE) as f32).ceil() as i32;
             let max_y = (region.1.y / (CHUNK_SIZE * CELL_SIZE) as f32).ceil() as i32;
 
-            info!("Update region: ({}, {}) to ({}, {})", min_x, min_y, max_x, max_y);
+            info!(
+                "Update region: ({}, {}) to ({}, {})",
+                min_x, min_y, max_x, max_y
+            );
             for chunk_x in min_x..=max_x {
                 for chunk_y in min_y..=max_y {
                     for neighbor_chunk in ChunkUtils::get_neighbor_chunks(chunk_x, chunk_y) {
@@ -351,16 +379,28 @@ fn update_material_textures(
     world_materials: Res<WorldMaterials>,
 ) {
     for (entity, solid_object) in solid_objects.iter() {
+        let material_def = match world_materials.materials.get(&solid_object.material_id) {
+            Some(mat) => mat,
+            None => continue,
+        };
+
+        // Mise à jour du sprite principal (texture ou couleur pleine)
         if let Some(texture) = solid_object.get_texture(&world_materials) {
             let mut sprite = Sprite::from_image(texture);
             sprite.custom_size = Some(VEC2_CELL_SIZE);
             commands.entity(entity).insert(sprite);
         } else {
-            // In case the bloc is completely surrounded by other blocs, we create a plain color sprite
-            if let Some(material_def) = world_materials.materials.get(&solid_object.material_id) {
-                let sprite = Sprite::from_color(material_def.color, VEC2_CELL_SIZE);
-                commands.entity(entity).insert(sprite);
-            }
+            let sprite = Sprite::from_color(material_def.color, VEC2_CELL_SIZE);
+            commands.entity(entity).insert(sprite);
+        }
+
+        // Ici, on peut supprimer d'anciennes entités enfants portant le marqueur MaskOverlay
+        // (par exemple, en itérant sur les enfants connus et en les désactivant ou en les supprimant)
+        // Pour la simplicité, nous ne détaillons pas ici la logique de suppression.
+
+        // Ensuite, si le bloc est mergeable (donc susceptible de nécessiter des masques), on ajoute les overlays.
+        if solid_object.mergeable {
+            spawn_border_masks(&mut commands, entity, material_def.color, solid_object.neighbors_pattern);
         }
     }
 }
@@ -374,4 +414,107 @@ pub fn trigger_terrain_update(
         region: None,
         chunk_coords: Some((chunk_x, chunk_y)),
     });
+}
+
+fn spawn_border_masks(
+    commands: &mut Commands,
+    parent: Entity,
+    mask_color: Color,
+    neighbors_pattern: u8,
+) {
+    let half_cell = CELL_SIZE / 2; // 40.0
+    let inner_offset = 0.0; // 40 - 17.5 = 22.5
+
+    // Pour faciliter le test, on définit pour chaque côté s'il est présent ou non.
+    let has_top = (neighbors_pattern & NEIGHBOR_TOP) != 0;
+    let has_bottom = (neighbors_pattern & NEIGHBOR_BOTTOM) != 0;
+    let has_left = (neighbors_pattern & NEIGHBOR_LEFT) != 0;
+    let has_right = (neighbors_pattern & NEIGHBOR_RIGHT) != 0;
+
+    let debug_color = Color::srgb(1.0, 0.0, 0.0);
+
+    // --- Coins : si deux côtés adjacents sont présents, on ajoute un masque carré pour masquer le coin intérieur.
+    // Par exemple, si il n'y a ni voisin en haut ni en gauche, on affiche un carré dans le coin supérieur gauche.
+    if !has_top && !has_left {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::splat(MASK_THICKNESS)),
+                    Transform::from_xyz(-inner_offset, inner_offset, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_top && !has_right {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::splat(MASK_THICKNESS)),
+                    Transform::from_xyz(inner_offset, inner_offset, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_bottom && !has_left {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::splat(MASK_THICKNESS)),
+                    Transform::from_xyz(-inner_offset, -inner_offset, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_bottom && !has_right {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::splat(MASK_THICKNESS)),
+                    Transform::from_xyz(inner_offset, -inner_offset, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+
+    // --- Bords simples : si un seul côté manque ET que l'opposé est présent (ce qui évite de doubler avec le coin déjà traité),
+    // on ajoute un sprite rectangulaire couvrant toute la largeur (ou hauteur) de la cellule.
+    if !has_top && has_left && has_right {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(debug_color, Vec2::new(CELL_SIZE as f32, MASK_THICKNESS)),
+                    Transform::from_xyz(0.0, -22.5, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_bottom && has_left && has_right {
+        commands.entity(parent).with_children(|parent| {
+            let sprite =
+                Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, MASK_THICKNESS));
+            parent
+                .spawn((sprite, Transform::from_xyz(0.0, -inner_offset, 0.1)))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_left && has_top && has_bottom {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::new(MASK_THICKNESS, CELL_SIZE as f32)),
+                    Transform::from_xyz(-inner_offset, 0.0, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_right && has_top && has_bottom {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::new(MASK_THICKNESS, CELL_SIZE as f32)),
+                    Transform::from_xyz(inner_offset, 0.0, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
 }
