@@ -21,8 +21,7 @@ impl Plugin for TerrainPlugin {
                 PostStartup,
                 (
                     update_neighbors_pattern,
-                    update_material_textures,
-                    update_sprite_rotations,
+                    update_material_textures
                 ),
             )
             .add_systems(
@@ -31,20 +30,23 @@ impl Plugin for TerrainPlugin {
                     update_solid_objects,
                     update_neighbors_pattern.run_if(on_event::<UpdateTerrainEvent>),
                     update_material_textures.run_if(on_event::<UpdateTerrainEvent>),
-                    update_sprite_rotations.run_if(on_event::<UpdateTerrainEvent>),
                 ),
             );
     }
 }
 
-/// Initialise les définitions des matériaux et entités.
-/// Doit être exécuté avant tout autre système, dans la phase PreStartup !
+/// This method initialises the world definitions
+/// It loads the materials and entities from the asset server.
+///
+/// **Note:** This method should be executed before any other system, in the PreStartup phase!
 fn init_world_definitions(
     mut world_materials: ResMut<WorldMaterials>,
     mut world_entities: ResMut<WorldEntities>,
     asset_server: Res<AssetServer>,
 ) {
-    // Initialiser les matériaux martiens
+    info!("Initialising world definitions...");
+
+    info!("Loading materials...");
     let mut materials = HashMap::new();
 
     materials.insert(
@@ -57,10 +59,8 @@ fn init_world_definitions(
             drop_count_max: 3,
             can_be_merged: true,
             rarity: 0.0, // Très commun
-            plain_texture: asset_server.load("textures/terrain/rock/plain.png"),
-            side_texture: asset_server.load("textures/terrain/rock/side.png"),
-            inter_corner_texture: asset_server.load("textures/terrain/rock/inter-corner.png"),
-            outer_corner_texture: asset_server.load("textures/terrain/rock/outer-corner.png"),
+            sprites: load_material_sprites(&asset_server, "rock"),
+            color: Color::srgb(85.0 / 255.0, 51.0 / 255.0, 36.0 / 255.0), // #553324
         },
     );
 
@@ -74,10 +74,8 @@ fn init_world_definitions(
             drop_count_max: 2,
             can_be_merged: true,
             rarity: 0.3, // Assez rare
-            plain_texture: asset_server.load("textures/terrain/basalt/plain.png"),
-            side_texture: asset_server.load("textures/terrain/basalt/side.png"),
-            inter_corner_texture: asset_server.load("textures/terrain/basalt/inter-corner.png"),
-            outer_corner_texture: asset_server.load("textures/terrain/basalt/outer-corner.png"),
+            sprites: load_material_sprites(&asset_server, "basalt"),
+            color: Color::srgb(47.0 / 255.0, 47.0 / 255.0, 47.0 / 255.0), // #2F2F2F
         },
     );
 
@@ -90,17 +88,16 @@ fn init_world_definitions(
             drop_count_min: 1,
             drop_count_max: 1,
             can_be_merged: false, // Apparaît toujours comme des cristaux individuels
-            rarity: 0.7,          // Très rare
-            plain_texture: asset_server.load("textures/terrain/olivine/plain.png"),
-            side_texture: asset_server.load("textures/terrain/olivine/side.png"),
-            inter_corner_texture: asset_server.load("textures/terrain/olivine/inter-corner.png"),
-            outer_corner_texture: asset_server.load("textures/terrain/olivine/outer-corner.png"),
+            rarity: 0.7, // Très rare
+            sprites: load_material_sprites(&asset_server, "olivine"),
+            color: Color::srgb(33.0 / 255.0, 72.0 / 255.0, 40.0 / 255.0), // #214828
         },
     );
 
     world_materials.materials = materials;
+    info!("World materials initialised");
 
-    // Initialiser les entités
+    info!("Loading entities...");
     let mut entities = HashMap::new();
 
     entities.insert(
@@ -131,6 +128,28 @@ fn init_world_definitions(
     );
 
     world_entities.entities = entities;
+    info!("World entities initialised");
+    info!("World definitions initialised");
+}
+
+/// This method loads the material sprites from the asset server
+fn load_material_sprites(asset_server: &Res<AssetServer>, material_id: &str) -> HashMap<String, Handle<Image>> {
+    let mut sprites: HashMap<String, Handle<Image>> = HashMap::new();
+
+    let sprite_names = [
+        "alone", "bottom-right", "bottom", "left-bottom-right",
+        "left-bottom", "left-right", "top-left", "left",
+        "right", "top-bottom-right", "top-bottom", "top-left-bottom-right",
+        "top-left-bottom", "top-left-right", "top-right", "top"
+    ];
+
+    for name in sprite_names.iter() {
+        let path = format!("textures/terrain/{}/{}.png", material_id, name);
+        sprites.insert(name.to_string(), asset_server.load(&path));
+        info!("Loaded sprite: {}", path);
+    }
+
+    sprites
 }
 
 /// Système pour mettre à jour les objets solides (détruire si health = 0)
@@ -325,7 +344,7 @@ fn find_chunks_to_update(event_reader: &mut EventReader<UpdateTerrainEvent>, chu
     chunks_to_update
 }
 
-/// Système pour mettre à jour les textures des matériaux en fonction des voisins
+/// This system updates the material textures for the given solid objects
 fn update_material_textures(
     mut commands: Commands,
     solid_objects: Query<(Entity, &SolidObject), Changed<SolidObject>>,
@@ -337,70 +356,6 @@ fn update_material_textures(
             let mut sprite = Sprite::from_image(texture);
             sprite.custom_size = Some(VEC2_CELL_SIZE);
             commands.entity(entity).insert(sprite);
-        }
-    }
-}
-
-/// Système pour gérer les rotations de sprite en fonction du pattern de voisinage
-fn update_sprite_rotations(mut query: Query<(&SolidObject, &mut Transform), Changed<SolidObject>>) {
-    for (solid_object, mut transform) in query.iter_mut() {
-        // Si l'objet n'est pas fusionnable, garde sa rotation par défaut
-        if !solid_object.mergeable {
-            continue;
-        }
-
-        // Définis la rotation en fonction du pattern de voisinage
-        let pattern = solid_object.neighbors_pattern;
-
-        if solid_object.is_side() {
-            // Rotation pour les côtés
-            match pattern {
-                NEIGHBOR_RIGHT => transform.rotation = Quat::from_rotation_z(0.0),
-                NEIGHBOR_TOP => {
-                    transform.rotation = Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)
-                }
-                NEIGHBOR_LEFT => transform.rotation = Quat::from_rotation_z(std::f32::consts::PI),
-                NEIGHBOR_BOTTOM => {
-                    transform.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
-                }
-                _ => {}
-            }
-        } else if solid_object.is_outer_corner() {
-            // Rotation pour les coins extérieurs
-            match pattern {
-                NEIGHBOR_TOP_RIGHT => transform.rotation = Quat::from_rotation_z(0.0),
-                NEIGHBOR_TOP_LEFT => {
-                    transform.rotation = Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)
-                }
-                NEIGHBOR_BOTTOM_LEFT => {
-                    transform.rotation = Quat::from_rotation_z(std::f32::consts::PI)
-                }
-                NEIGHBOR_BOTTOM_RIGHT => {
-                    transform.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
-                }
-                _ => {}
-            }
-        } else if solid_object.is_inner_corner() {
-            // Rotation pour les coins intérieurs
-            if (pattern & (NEIGHBOR_RIGHT | NEIGHBOR_TOP) == (NEIGHBOR_RIGHT | NEIGHBOR_TOP))
-                && (pattern & NEIGHBOR_TOP_RIGHT == 0)
-            {
-                transform.rotation = Quat::from_rotation_z(0.0);
-            } else if (pattern & (NEIGHBOR_TOP | NEIGHBOR_LEFT) == (NEIGHBOR_TOP | NEIGHBOR_LEFT))
-                && (pattern & NEIGHBOR_TOP_LEFT == 0)
-            {
-                transform.rotation = Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2);
-            } else if (pattern & (NEIGHBOR_LEFT | NEIGHBOR_BOTTOM)
-                == (NEIGHBOR_LEFT | NEIGHBOR_BOTTOM))
-                && (pattern & NEIGHBOR_BOTTOM_LEFT == 0)
-            {
-                transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
-            } else if (pattern & (NEIGHBOR_BOTTOM | NEIGHBOR_RIGHT)
-                == (NEIGHBOR_BOTTOM | NEIGHBOR_RIGHT))
-                && (pattern & NEIGHBOR_BOTTOM_RIGHT == 0)
-            {
-                transform.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
-            }
         }
     }
 }

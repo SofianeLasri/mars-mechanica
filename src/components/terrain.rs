@@ -72,10 +72,8 @@ pub struct MaterialDefinition {
     pub drop_count_max: i32,
     pub can_be_merged: bool,
     pub rarity: f32, // Rareté du matériau (0.0 = commun, 1.0 = très rare)
-    pub plain_texture: Handle<Image>,
-    pub side_texture: Handle<Image>,
-    pub inter_corner_texture: Handle<Image>,
-    pub outer_corner_texture: Handle<Image>,
+    pub sprites: HashMap<String, Handle<Image>>,
+    pub color: Color, // Couleur pour les blocs pleins
 }
 
 #[derive(Clone)]
@@ -148,60 +146,59 @@ impl Default for ChunkMap {
 // --- MÉTHODES UTILITAIRES ---
 
 impl SolidObject {
-    // Détermine quelle texture utiliser en fonction du motif de voisinage
+    /// This method returns the texture to use for the solid object based on its neighbors.
     pub fn get_texture(&self, world_materials: &WorldMaterials) -> Option<Handle<Image>> {
         if let Some(material_def) = world_materials.materials.get(&self.material_id) {
             if !self.mergeable {
-                return Some(material_def.plain_texture.clone());
+                return material_def.sprites.get("alone").cloned();
             }
 
-            // Logique pour choisir la texture en fonction des voisins
-            if self.is_outer_corner() {
-                Some(material_def.outer_corner_texture.clone())
-            } else if self.is_inner_corner() {
-                Some(material_def.inter_corner_texture.clone())
-            } else if self.is_side() {
-                Some(material_def.side_texture.clone())
-            } else {
-                Some(material_def.plain_texture.clone())
+            let sprite_name = self.get_sprite_name();
+
+            // TODO: Voir comment gérer l'intérieur des structures
+            if sprite_name == "top-left-bottom-right" {
+                //return Some(create_solid_color_sprite(material_def.color));
             }
-        } else {
-            None
+
+            if let Some(sprite) = material_def.sprites.get(&sprite_name) {
+                return Some(sprite.clone());
+            }
+
+            return material_def.sprites.get("alone").cloned();
         }
+
+        None
     }
 
-    // Vérifie si c'est un coin extérieur (un seul voisin diagonal)
-    pub fn is_outer_corner(&self) -> bool {
+    // Convertit le pattern de voisinage en nom de fichier de sprite
+    fn get_sprite_name(&self) -> String {
         let pattern = self.neighbors_pattern;
-        // Vérifie les cas de coins extérieurs
-        (pattern == NEIGHBOR_TOP_RIGHT) ||
-            (pattern == NEIGHBOR_TOP_LEFT) ||
-            (pattern == NEIGHBOR_BOTTOM_LEFT) ||
-            (pattern == NEIGHBOR_BOTTOM_RIGHT)
-    }
 
-    // Vérifie si c'est un coin intérieur (trois voisins mais pas en diagonale)
-    pub fn is_inner_corner(&self) -> bool {
-        let pattern = self.neighbors_pattern;
-        // Vérifie les cas de coins intérieurs
-        (pattern & (NEIGHBOR_RIGHT | NEIGHBOR_TOP) == (NEIGHBOR_RIGHT | NEIGHBOR_TOP) &&
-            pattern & NEIGHBOR_TOP_RIGHT == 0) ||
-            (pattern & (NEIGHBOR_TOP | NEIGHBOR_LEFT) == (NEIGHBOR_TOP | NEIGHBOR_LEFT) &&
-                pattern & NEIGHBOR_TOP_LEFT == 0) ||
-            (pattern & (NEIGHBOR_LEFT | NEIGHBOR_BOTTOM) == (NEIGHBOR_LEFT | NEIGHBOR_BOTTOM) &&
-                pattern & NEIGHBOR_BOTTOM_LEFT == 0) ||
-            (pattern & (NEIGHBOR_BOTTOM | NEIGHBOR_RIGHT) == (NEIGHBOR_BOTTOM | NEIGHBOR_RIGHT) &&
-                pattern & NEIGHBOR_BOTTOM_RIGHT == 0)
-    }
+        // Vérifier si c'est un bloc seul (pas de voisins)
+        if pattern == 0 {
+            return "alone".to_string();
+        }
 
-    // Vérifie si c'est un côté (un seul voisin orthogonal)
-    pub fn is_side(&self) -> bool {
-        let pattern = self.neighbors_pattern;
-        // Vérifie les cas de côtés
-        pattern == NEIGHBOR_RIGHT ||
-            pattern == NEIGHBOR_TOP ||
-            pattern == NEIGHBOR_LEFT ||
-            pattern == NEIGHBOR_BOTTOM
+        // Créer le nom basé sur les voisins présents
+        let mut parts = Vec::new();
+
+        if pattern & NEIGHBOR_TOP != 0 {
+            parts.push("top");
+        }
+
+        if pattern & NEIGHBOR_LEFT != 0 {
+            parts.push("left");
+        }
+
+        if pattern & NEIGHBOR_BOTTOM != 0 {
+            parts.push("bottom");
+        }
+
+        if pattern & NEIGHBOR_RIGHT != 0 {
+            parts.push("right");
+        }
+
+        parts.join("-")
     }
 }
 

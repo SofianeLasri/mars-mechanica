@@ -15,7 +15,6 @@ pub fn generate_world(
 
     info!("Generating world...");
 
-    // Générer le monde chunk par chunk
     for chunk_x in -MAP_SIZE / 2..MAP_SIZE / 2 {
         for chunk_y in -MAP_SIZE / 2..MAP_SIZE / 2 {
             generate_chunk(
@@ -32,14 +31,13 @@ pub fn generate_world(
 
     info!("World generated! Chunks: {}", chunk_map.chunks.len());
 
-    // Envoyer l'événement de mise à jour du terrain
     event_writer.send(UpdateTerrainEvent {
         region: None,
         chunk_coords: None,
     });
 }
 
-/// Génère un chunk du terrain avec ses cellules et objets solides
+/// Genereates a chunk of terrain with its cells and solid objects
 fn generate_chunk(
     commands: &mut Commands,
     chunk_map: &mut ChunkMap,
@@ -49,10 +47,8 @@ fn generate_chunk(
     chunk_x: i32,
     chunk_y: i32,
 ) {
-    // Créer une entrée pour ce chunk dans la ChunkMap
     chunk_map.chunks.insert((chunk_x, chunk_y), HashSet::new());
 
-    // Générer les cellules du chunk
     for local_x in 0..CHUNK_SIZE {
         for local_y in 0..CHUNK_SIZE {
             let world_x = chunk_x * CHUNK_SIZE + local_x;
@@ -60,7 +56,6 @@ fn generate_chunk(
 
             let (coord_x, coord_y) = calc_cell_coordinates(&world_x, &world_y);
 
-            // Générer la cellule du terrain (sol martien)
             let mut sprite = Sprite::from_color(
                 MARS_GROUND_COLOR,
                 VEC2_CELL_SIZE,
@@ -100,7 +95,6 @@ fn generate_chunk(
                 let material_def = world_materials.materials.get(material_id).unwrap();
                 let mergeable = material_def.can_be_merged;
 
-                // Détermine la santé en fonction du type de matériau
                 let health = match material_id {
                     "olivine" => 8.0,
                     "basalt" => 5.0,
@@ -108,10 +102,12 @@ fn generate_chunk(
                     _ => 1.0,
                 };
 
-                let mut sprite = Sprite::from_image(material_def.plain_texture.clone());
+                let mut sprite = Sprite::from_color(
+                    material_def.color,
+                    VEC2_CELL_SIZE,
+                );
                 sprite.custom_size = Some(VEC2_CELL_SIZE);
 
-                // Spawn l'objet solide
                 let entity = commands.spawn((
                     sprite,
                     Transform::from_xyz(coord_x as f32, coord_y as f32, 1.0),
@@ -120,12 +116,11 @@ fn generate_chunk(
                         health,
                         max_health: health,
                         mergeable,
-                        neighbors_pattern: 0, // Sera mis à jour par le système update_neighbors_pattern
+                        neighbors_pattern: 0, // Will be calculated later
                     },
                     TerrainChunk { chunk_x, chunk_y },
                 )).id();
 
-                // Ajouter l'entité à la map de chunks
                 if let Some(chunk_entities) = chunk_map.chunks.get_mut(&(chunk_x, chunk_y)) {
                     chunk_entities.insert(entity);
                 }
