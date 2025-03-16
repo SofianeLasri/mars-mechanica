@@ -102,7 +102,7 @@ pub const MAP_SIZE: i32 = 8;
 /// Size of each block in pixels with 100% OS scaling.
 pub const CELL_SIZE: i32 = 80;
 pub const VEC2_CELL_SIZE: Vec2 = Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32);
-pub const MASK_THICKNESS: f32 = 35.0;
+pub const MASK_THICKNESS: f32 = 20.0;
 
 pub const MARS_GROUND_COLOR: Color = Color::srgb(192.0 / 255.0, 122.0 / 255.0, 91.0 / 255.0);
 

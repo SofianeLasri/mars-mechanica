@@ -400,7 +400,12 @@ fn update_material_textures(
 
         // Ensuite, si le bloc est mergeable (donc susceptible de nécessiter des masques), on ajoute les overlays.
         if solid_object.mergeable {
-            spawn_border_masks(&mut commands, entity, material_def.color, solid_object.neighbors_pattern);
+            spawn_border_masks(
+                &mut commands,
+                entity,
+                material_def.color,
+                solid_object.neighbors_pattern,
+            );
         }
     }
 }
@@ -422,8 +427,8 @@ fn spawn_border_masks(
     mask_color: Color,
     neighbors_pattern: u8,
 ) {
-    let half_cell = CELL_SIZE / 2; // 40.0
-    let inner_offset = 0.0; // 40 - 17.5 = 22.5
+    let half_cell: f32 = (CELL_SIZE / 2) as f32; // half_cell
+    let inner_offset = MASK_THICKNESS;
 
     // Pour faciliter le test, on définit pour chaque côté s'il est présent ou non.
     let has_top = (neighbors_pattern & NEIGHBOR_TOP) != 0;
@@ -444,8 +449,8 @@ fn spawn_border_masks(
         commands.entity(parent).with_children(|parent| {
             parent
                 .spawn((
-                    Sprite::from_color(mask_color, Vec2::splat(40.0)),
-                    Transform::from_xyz(20.0, -20.0, 0.1),
+                    Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                    Transform::from_xyz(inner_offset, -inner_offset, 0.1),
                 ))
                 .insert(MaskOverlay);
         });
@@ -454,8 +459,8 @@ fn spawn_border_masks(
         commands.entity(parent).with_children(|parent| {
             parent
                 .spawn((
-                    Sprite::from_color(mask_color, Vec2::splat(40.0)),
-                    Transform::from_xyz(20.0, 20.0, 0.1),
+                    Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                    Transform::from_xyz(inner_offset, inner_offset, 0.1),
                 ))
                 .insert(MaskOverlay);
         });
@@ -464,8 +469,8 @@ fn spawn_border_masks(
         commands.entity(parent).with_children(|parent| {
             parent
                 .spawn((
-                    Sprite::from_color(mask_color, Vec2::splat(40.0)),
-                    Transform::from_xyz(-20.0, 20.0, 0.1),
+                    Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                    Transform::from_xyz(-inner_offset, inner_offset, 0.1),
                 ))
                 .insert(MaskOverlay);
         });
@@ -474,80 +479,164 @@ fn spawn_border_masks(
         commands.entity(parent).with_children(|parent| {
             parent
                 .spawn((
-                    Sprite::from_color(mask_color, Vec2::splat(40.0)),
-                    Transform::from_xyz(-20.0, -20.0, 0.1),
-                ))
-                .insert(MaskOverlay);
-        });
-    }
-    /*if !has_top && !has_right {
-        commands.entity(parent).with_children(|parent| {
-            parent
-                .spawn((
-                    Sprite::from_color(mask_color, Vec2::splat(MASK_THICKNESS)),
-                    Transform::from_xyz(inner_offset, inner_offset, 0.1),
-                ))
-                .insert(MaskOverlay);
-        });
-    }
-    if !has_bottom && !has_left {
-        commands.entity(parent).with_children(|parent| {
-            parent
-                .spawn((
-                    Sprite::from_color(mask_color, Vec2::splat(MASK_THICKNESS)),
+                    Sprite::from_color(mask_color, Vec2::splat(half_cell)),
                     Transform::from_xyz(-inner_offset, -inner_offset, 0.1),
                 ))
                 .insert(MaskOverlay);
         });
     }
-    if !has_bottom && !has_right {
-        commands.entity(parent).with_children(|parent| {
-            parent
-                .spawn((
-                    Sprite::from_color(mask_color, Vec2::splat(MASK_THICKNESS)),
-                    Transform::from_xyz(inner_offset, -inner_offset, 0.1),
-                ))
-                .insert(MaskOverlay);
-        });
-    }*/
+
+    if has_top && has_bottom && has_right && has_left {
+        // 1 missing corner
+        if !has_top_left && has_bottom_left && has_bottom_right && has_top_right {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                        Transform::from_xyz(-inner_offset, -inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_bottom_left & has_bottom_right && has_top_right && has_top_left {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                        Transform::from_xyz(-inner_offset, inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+        if !has_bottom_right && has_top_right && has_top_left && has_bottom_left {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(-inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                        Transform::from_xyz(inner_offset, inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_top_right && has_top_left && has_bottom_left && has_bottom_right {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(-inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                        Transform::from_xyz(inner_offset, -inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        // Two missing corners
+        if !has_top_left && !has_bottom_left && has_bottom_right && has_top_right {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_bottom_left && !has_bottom_right && has_top_right && has_top_left {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, half_cell)),
+                        Transform::from_xyz(0.0, inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_bottom_right && !has_top_right && has_top_left && has_bottom_left {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(-inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_top_right && !has_top_left && has_bottom_left && has_bottom_right {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, half_cell)),
+                        Transform::from_xyz(0.0, -inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+    }
 
     // --- Bords simples : si un seul côté manque ET que l'opposé est présent (ce qui évite de doubler avec le coin déjà traité),
     // on ajoute un sprite rectangulaire couvrant toute la largeur (ou hauteur) de la cellule.
-    if !has_top && has_left && has_right {
+    if !has_top && has_left && has_right && has_bottom {
         commands.entity(parent).with_children(|parent| {
             parent
                 .spawn((
-                    Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, 40.0)),
-                    Transform::from_xyz(0.0, -20.0, 0.1),
+                    Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, half_cell)),
+                    Transform::from_xyz(0.0, -inner_offset, 0.1),
                 ))
                 .insert(MaskOverlay);
         });
     }
-    if !has_bottom && has_left && has_right {
+    if !has_bottom && has_left && has_right && has_top {
         commands.entity(parent).with_children(|parent| {
-            let sprite =
-                Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, 40.0));
+            let sprite = Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, half_cell));
             parent
-                .spawn((sprite, Transform::from_xyz(0.0, 20.0, 0.1)))
+                .spawn((sprite, Transform::from_xyz(0.0, inner_offset, 0.1)))
                 .insert(MaskOverlay);
         });
     }
-    if !has_left && has_top && has_bottom {
+    if !has_left && has_top && has_bottom && has_right {
         commands.entity(parent).with_children(|parent| {
             parent
                 .spawn((
-                    Sprite::from_color(mask_color, Vec2::new(40.0, CELL_SIZE as f32)),
-                    Transform::from_xyz(20.0, 0.0, 0.1),
+                    Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                    Transform::from_xyz(inner_offset, 0.0, 0.1),
                 ))
                 .insert(MaskOverlay);
         });
     }
-    if !has_right && has_top && has_bottom {
+    if !has_right && has_top && has_bottom && has_left {
         commands.entity(parent).with_children(|parent| {
             parent
                 .spawn((
-                    Sprite::from_color(mask_color, Vec2::new(40.0, CELL_SIZE as f32)),
-                    Transform::from_xyz(-20.0, 0.0, 0.1),
+                    Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                    Transform::from_xyz(-inner_offset, 0.0, 0.1),
                 ))
                 .insert(MaskOverlay);
         });
