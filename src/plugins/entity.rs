@@ -37,7 +37,7 @@ fn spawn_multiple_squares(
         Vec2::new(0.0, 200.0),
     ];
 
-    let image = asset_server.load("textures/terrain/rock/inter-corner.png");
+    let image = asset_server.load("textures/terrain/rock/alone.png");
     let material = materials.add(ColorMaterial {
         texture: Some(image),
         ..Default::default()

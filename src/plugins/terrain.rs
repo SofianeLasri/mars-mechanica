@@ -1,8 +1,8 @@
 use crate::components::{
-    ChunkMap, ChunkUtils, EntityDefinition, MaterialDefinition, SolidObject, UpdateTerrainEvent,
-    WorldEntities, WorldMaterials, CELL_SIZE, CHUNK_SIZE, NEIGHBOR_BOTTOM,
-    NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP,
-    NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE,
+    ChunkMap, ChunkUtils, EntityDefinition, MaskOverlay, MaterialDefinition, SolidObject, UpdateTerrainEvent,
+    WorldEntities, WorldMaterials, CELL_SIZE, CHUNK_SIZE,
+    MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT,
+    NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE,
 };
 use bevy::prelude::*;
 use rand::Rng;
@@ -19,11 +19,7 @@ impl Plugin for TerrainPlugin {
             .add_systems(PreStartup, init_world_definitions)
             .add_systems(
                 PostStartup,
-                (
-                    update_neighbors_pattern,
-                    update_material_textures,
-                    update_sprite_rotations,
-                ),
+                (update_neighbors_pattern, update_material_textures),
             )
             .add_systems(
                 FixedUpdate,
@@ -31,20 +27,23 @@ impl Plugin for TerrainPlugin {
                     update_solid_objects,
                     update_neighbors_pattern.run_if(on_event::<UpdateTerrainEvent>),
                     update_material_textures.run_if(on_event::<UpdateTerrainEvent>),
-                    update_sprite_rotations.run_if(on_event::<UpdateTerrainEvent>),
                 ),
             );
     }
 }
 
-/// Initialise les définitions des matériaux et entités.
-/// Doit être exécuté avant tout autre système, dans la phase PreStartup !
+/// This method initialises the world definitions
+/// It loads the materials and entities from the asset server.
+///
+/// **Note:** This method should be executed before any other system, in the PreStartup phase!
 fn init_world_definitions(
     mut world_materials: ResMut<WorldMaterials>,
     mut world_entities: ResMut<WorldEntities>,
     asset_server: Res<AssetServer>,
 ) {
-    // Initialiser les matériaux martiens
+    info!("Initialising world definitions...");
+
+    info!("Loading materials...");
     let mut materials = HashMap::new();
 
     materials.insert(
@@ -57,10 +56,8 @@ fn init_world_definitions(
             drop_count_max: 3,
             can_be_merged: true,
             rarity: 0.0, // Très commun
-            plain_texture: asset_server.load("textures/terrain/rock/plain.png"),
-            side_texture: asset_server.load("textures/terrain/rock/side.png"),
-            inter_corner_texture: asset_server.load("textures/terrain/rock/inter-corner.png"),
-            outer_corner_texture: asset_server.load("textures/terrain/rock/outer-corner.png"),
+            sprites: load_material_sprites(&asset_server, "rock"),
+            color: Color::srgb(85.0 / 255.0, 51.0 / 255.0, 36.0 / 255.0), // #553324
         },
     );
 
@@ -74,10 +71,8 @@ fn init_world_definitions(
             drop_count_max: 2,
             can_be_merged: true,
             rarity: 0.3, // Assez rare
-            plain_texture: asset_server.load("textures/terrain/basalt/plain.png"),
-            side_texture: asset_server.load("textures/terrain/basalt/side.png"),
-            inter_corner_texture: asset_server.load("textures/terrain/basalt/inter-corner.png"),
-            outer_corner_texture: asset_server.load("textures/terrain/basalt/outer-corner.png"),
+            sprites: load_material_sprites(&asset_server, "basalt"),
+            color: Color::srgb(47.0 / 255.0, 47.0 / 255.0, 47.0 / 255.0), // #2F2F2F
         },
     );
 
@@ -91,16 +86,15 @@ fn init_world_definitions(
             drop_count_max: 1,
             can_be_merged: false, // Apparaît toujours comme des cristaux individuels
             rarity: 0.7,          // Très rare
-            plain_texture: asset_server.load("textures/terrain/olivine/plain.png"),
-            side_texture: asset_server.load("textures/terrain/olivine/side.png"),
-            inter_corner_texture: asset_server.load("textures/terrain/olivine/inter-corner.png"),
-            outer_corner_texture: asset_server.load("textures/terrain/olivine/outer-corner.png"),
+            sprites: load_material_sprites(&asset_server, "olivine"),
+            color: Color::srgb(33.0 / 255.0, 72.0 / 255.0, 40.0 / 255.0), // #214828
         },
     );
 
     world_materials.materials = materials;
+    info!("World materials initialised");
 
-    // Initialiser les entités
+    info!("Loading entities...");
     let mut entities = HashMap::new();
 
     entities.insert(
@@ -131,6 +125,43 @@ fn init_world_definitions(
     );
 
     world_entities.entities = entities;
+    info!("World entities initialised");
+    info!("World definitions initialised");
+}
+
+/// This method loads the material sprites from the asset server
+fn load_material_sprites(
+    asset_server: &Res<AssetServer>,
+    material_id: &str,
+) -> HashMap<String, Handle<Image>> {
+    let mut sprites: HashMap<String, Handle<Image>> = HashMap::new();
+
+    let sprite_names = [
+        "alone",
+        "bottom-right",
+        "bottom",
+        "left-bottom-right",
+        "left-bottom",
+        "left-right",
+        "top-left",
+        "left",
+        "right",
+        "top-bottom-right",
+        "top-bottom",
+        "top-left-bottom-right",
+        "top-left-bottom",
+        "top-left-right",
+        "top-right",
+        "top",
+    ];
+
+    for name in sprite_names.iter() {
+        let path = format!("textures/terrain/{}/{}.png", material_id, name);
+        sprites.insert(name.to_string(), asset_server.load(&path));
+        info!("Loaded sprite: {}", path);
+    }
+
+    sprites
 }
 
 /// Système pour mettre à jour les objets solides (détruire si health = 0)
@@ -232,7 +263,13 @@ fn update_neighbors_pattern(
 /// It takes care of checking the 8 directions for neighbors and returns a u8 pattern.
 ///
 /// It also checks if the neighbors are of the same material.
-fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: Entity, x: i32, y: i32, material_id: &String) -> u8 {
+fn get_neighbors_pattern(
+    positions: &Vec<(i32, i32, Entity, String)>,
+    entity: Entity,
+    x: i32,
+    y: i32,
+    material_id: &String,
+) -> u8 {
     let mut pattern: u8 = 0;
 
     // Vérification des 8 directions pour les voisins
@@ -244,9 +281,10 @@ fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: En
         pattern |= NEIGHBOR_RIGHT;
     }
     // Haut-Droite
-    if positions.iter().any(|(px, py, e, mat)| {
-        *px == x + 1 && *py == y + 1 && *e != entity && mat == material_id
-    }) {
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x + 1 && *py == y + 1 && *e != entity && mat == material_id)
+    {
         pattern |= NEIGHBOR_TOP_RIGHT;
     }
     // Haut
@@ -257,9 +295,10 @@ fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: En
         pattern |= NEIGHBOR_TOP;
     }
     // Haut-Gauche
-    if positions.iter().any(|(px, py, e, mat)| {
-        *px == x - 1 && *py == y + 1 && *e != entity && mat == material_id
-    }) {
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x - 1 && *py == y + 1 && *e != entity && mat == material_id)
+    {
         pattern |= NEIGHBOR_TOP_LEFT;
     }
     // Gauche
@@ -270,9 +309,10 @@ fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: En
         pattern |= NEIGHBOR_LEFT;
     }
     // Bas-Gauche
-    if positions.iter().any(|(px, py, e, mat)| {
-        *px == x - 1 && *py == y - 1 && *e != entity && mat == material_id
-    }) {
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x - 1 && *py == y - 1 && *e != entity && mat == material_id)
+    {
         pattern |= NEIGHBOR_BOTTOM_LEFT;
     }
     // Bas
@@ -283,16 +323,20 @@ fn get_neighbors_pattern(positions: &Vec<(i32, i32, Entity, String)>, entity: En
         pattern |= NEIGHBOR_BOTTOM;
     }
     // Bas-Droite
-    if positions.iter().any(|(px, py, e, mat)| {
-        *px == x + 1 && *py == y - 1 && *e != entity && mat == material_id
-    }) {
+    if positions
+        .iter()
+        .any(|(px, py, e, mat)| *px == x + 1 && *py == y - 1 && *e != entity && mat == material_id)
+    {
         pattern |= NEIGHBOR_BOTTOM_RIGHT;
     }
     pattern
 }
 
 /// This method finds the chunks to update based on the given event
-fn find_chunks_to_update(event_reader: &mut EventReader<UpdateTerrainEvent>, chunk_map: &Res<ChunkMap>) -> HashSet<(i32, i32)> {
+fn find_chunks_to_update(
+    event_reader: &mut EventReader<UpdateTerrainEvent>,
+    chunk_map: &Res<ChunkMap>,
+) -> HashSet<(i32, i32)> {
     let mut chunks_to_update = HashSet::new();
 
     for event in event_reader.read() {
@@ -307,7 +351,10 @@ fn find_chunks_to_update(event_reader: &mut EventReader<UpdateTerrainEvent>, chu
             let max_x = (region.1.x / (CHUNK_SIZE * CELL_SIZE) as f32).ceil() as i32;
             let max_y = (region.1.y / (CHUNK_SIZE * CELL_SIZE) as f32).ceil() as i32;
 
-            info!("Update region: ({}, {}) to ({}, {})", min_x, min_y, max_x, max_y);
+            info!(
+                "Update region: ({}, {}) to ({}, {})",
+                min_x, min_y, max_x, max_y
+            );
             for chunk_x in min_x..=max_x {
                 for chunk_y in min_y..=max_y {
                     for neighbor_chunk in ChunkUtils::get_neighbor_chunks(chunk_x, chunk_y) {
@@ -325,81 +372,52 @@ fn find_chunks_to_update(event_reader: &mut EventReader<UpdateTerrainEvent>, chu
     chunks_to_update
 }
 
-/// Système pour mettre à jour les textures des matériaux en fonction des voisins
+/// This system updates the material textures for the given solid objects
 fn update_material_textures(
     mut commands: Commands,
     solid_objects: Query<(Entity, &SolidObject), Changed<SolidObject>>,
     world_materials: Res<WorldMaterials>,
+    children_query: Query<&Children>,
+    mask_overlay_query: Query<(), With<MaskOverlay>>,
 ) {
     for (entity, solid_object) in solid_objects.iter() {
+        let material_def = match world_materials.materials.get(&solid_object.material_id) {
+            Some(mat) => mat,
+            None => continue,
+        };
+
         if let Some(texture) = solid_object.get_texture(&world_materials) {
-            // L'ancien sprite est remplacé par le nouveau
             let mut sprite = Sprite::from_image(texture);
             sprite.custom_size = Some(VEC2_CELL_SIZE);
             commands.entity(entity).insert(sprite);
+        } else {
+            let sprite = Sprite::from_color(material_def.color, VEC2_CELL_SIZE);
+            commands.entity(entity).insert(sprite);
+        }
+
+        remove_mask_overlays_from_parent(entity, &mut commands, &children_query, &mask_overlay_query);
+
+        if solid_object.mergeable {
+            spawn_border_masks(
+                &mut commands,
+                entity,
+                material_def.color,
+                solid_object.neighbors_pattern,
+            );
         }
     }
 }
 
-/// Système pour gérer les rotations de sprite en fonction du pattern de voisinage
-fn update_sprite_rotations(mut query: Query<(&SolidObject, &mut Transform), Changed<SolidObject>>) {
-    for (solid_object, mut transform) in query.iter_mut() {
-        // Si l'objet n'est pas fusionnable, garde sa rotation par défaut
-        if !solid_object.mergeable {
-            continue;
-        }
-
-        // Définis la rotation en fonction du pattern de voisinage
-        let pattern = solid_object.neighbors_pattern;
-
-        if solid_object.is_side() {
-            // Rotation pour les côtés
-            match pattern {
-                NEIGHBOR_RIGHT => transform.rotation = Quat::from_rotation_z(0.0),
-                NEIGHBOR_TOP => {
-                    transform.rotation = Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)
-                }
-                NEIGHBOR_LEFT => transform.rotation = Quat::from_rotation_z(std::f32::consts::PI),
-                NEIGHBOR_BOTTOM => {
-                    transform.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
-                }
-                _ => {}
-            }
-        } else if solid_object.is_outer_corner() {
-            // Rotation pour les coins extérieurs
-            match pattern {
-                NEIGHBOR_TOP_RIGHT => transform.rotation = Quat::from_rotation_z(0.0),
-                NEIGHBOR_TOP_LEFT => {
-                    transform.rotation = Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2)
-                }
-                NEIGHBOR_BOTTOM_LEFT => {
-                    transform.rotation = Quat::from_rotation_z(std::f32::consts::PI)
-                }
-                NEIGHBOR_BOTTOM_RIGHT => {
-                    transform.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
-                }
-                _ => {}
-            }
-        } else if solid_object.is_inner_corner() {
-            // Rotation pour les coins intérieurs
-            if (pattern & (NEIGHBOR_RIGHT | NEIGHBOR_TOP) == (NEIGHBOR_RIGHT | NEIGHBOR_TOP))
-                && (pattern & NEIGHBOR_TOP_RIGHT == 0)
-            {
-                transform.rotation = Quat::from_rotation_z(0.0);
-            } else if (pattern & (NEIGHBOR_TOP | NEIGHBOR_LEFT) == (NEIGHBOR_TOP | NEIGHBOR_LEFT))
-                && (pattern & NEIGHBOR_TOP_LEFT == 0)
-            {
-                transform.rotation = Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2);
-            } else if (pattern & (NEIGHBOR_LEFT | NEIGHBOR_BOTTOM)
-                == (NEIGHBOR_LEFT | NEIGHBOR_BOTTOM))
-                && (pattern & NEIGHBOR_BOTTOM_LEFT == 0)
-            {
-                transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
-            } else if (pattern & (NEIGHBOR_BOTTOM | NEIGHBOR_RIGHT)
-                == (NEIGHBOR_BOTTOM | NEIGHBOR_RIGHT))
-                && (pattern & NEIGHBOR_BOTTOM_RIGHT == 0)
-            {
-                transform.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
+fn remove_mask_overlays_from_parent(
+    parent: Entity,
+    mut commands: &mut Commands,
+    children_query: &Query<&Children>,
+    mask_overlay_query: &Query<(), With<MaskOverlay>>,
+) {
+    if let Ok(children) = children_query.get(parent) {
+        for &child in children.iter() {
+            if mask_overlay_query.get(child).is_ok() {
+                commands.entity(child).despawn_recursive();
             }
         }
     }
@@ -414,4 +432,226 @@ pub fn trigger_terrain_update(
         region: None,
         chunk_coords: Some((chunk_x, chunk_y)),
     });
+}
+
+fn spawn_border_masks(
+    commands: &mut Commands,
+    parent: Entity,
+    mask_color: Color,
+    neighbors_pattern: u8,
+) {
+    let half_cell: f32 = (CELL_SIZE / 2) as f32; // half_cell
+    let inner_offset = MASK_THICKNESS;
+
+    // Pour faciliter le test, on définit pour chaque côté s'il est présent ou non.
+    let has_top = (neighbors_pattern & NEIGHBOR_TOP) != 0;
+    let has_bottom = (neighbors_pattern & NEIGHBOR_BOTTOM) != 0;
+    let has_left = (neighbors_pattern & NEIGHBOR_LEFT) != 0;
+    let has_right = (neighbors_pattern & NEIGHBOR_RIGHT) != 0;
+
+    let has_top_left = (neighbors_pattern & NEIGHBOR_TOP_LEFT) != 0;
+    let has_top_right = (neighbors_pattern & NEIGHBOR_TOP_RIGHT) != 0;
+    let has_bottom_left = (neighbors_pattern & NEIGHBOR_BOTTOM_LEFT) != 0;
+    let has_bottom_right = (neighbors_pattern & NEIGHBOR_BOTTOM_RIGHT) != 0;
+
+    let debug_color = Color::srgb(1.0, 0.0, 0.0);
+
+    // --- Coins : si deux côtés adjacents sont présents, on ajoute un masque carré pour masquer le coin intérieur.
+    // Par exemple, si il n'y a ni voisin en haut ni en gauche, on affiche un carré dans le coin supérieur gauche.
+    if !has_top && !has_left && has_right && has_bottom && has_bottom_right {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                    Transform::from_xyz(inner_offset, -inner_offset, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if has_top && !has_left && !has_bottom && has_right && has_top_right {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                    Transform::from_xyz(inner_offset, inner_offset, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if has_top && has_left && !has_bottom && !has_right && has_top_left {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                    Transform::from_xyz(-inner_offset, inner_offset, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_top && has_left && has_bottom && !has_right && has_bottom_left {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                    Transform::from_xyz(-inner_offset, -inner_offset, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+
+    if has_top && has_bottom && has_right && has_left {
+        // 1 missing corner
+        if !has_top_left && has_bottom_left && has_bottom_right && has_top_right {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                        Transform::from_xyz(-inner_offset, -inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_bottom_left & has_bottom_right && has_top_right && has_top_left {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                        Transform::from_xyz(-inner_offset, inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+        if !has_bottom_right && has_top_right && has_top_left && has_bottom_left {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(-inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                        Transform::from_xyz(inner_offset, inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_top_right && has_top_left && has_bottom_left && has_bottom_right {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(-inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::splat(half_cell)),
+                        Transform::from_xyz(inner_offset, -inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        // Two missing corners
+        if !has_top_left && !has_bottom_left && has_bottom_right && has_top_right {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_bottom_left && !has_bottom_right && has_top_right && has_top_left {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, half_cell)),
+                        Transform::from_xyz(0.0, inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_bottom_right && !has_top_right && has_top_left && has_bottom_left {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                        Transform::from_xyz(-inner_offset, 0.0, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+
+        if !has_top_right && !has_top_left && has_bottom_left && has_bottom_right {
+            commands.entity(parent).with_children(|parent| {
+                parent
+                    .spawn((
+                        Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, half_cell)),
+                        Transform::from_xyz(0.0, -inner_offset, 0.1),
+                    ))
+                    .insert(MaskOverlay);
+            });
+        }
+    }
+
+    // --- Bords simples : si un seul côté manque ET que l'opposé est présent (ce qui évite de doubler avec le coin déjà traité),
+    // on ajoute un sprite rectangulaire couvrant toute la largeur (ou hauteur) de la cellule.
+    if !has_top && has_left && has_right && has_bottom {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, half_cell)),
+                    Transform::from_xyz(0.0, -inner_offset, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_bottom && has_left && has_right && has_top {
+        commands.entity(parent).with_children(|parent| {
+            let sprite = Sprite::from_color(mask_color, Vec2::new(CELL_SIZE as f32, half_cell));
+            parent
+                .spawn((sprite, Transform::from_xyz(0.0, inner_offset, 0.1)))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_left && has_top && has_bottom && has_right {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                    Transform::from_xyz(inner_offset, 0.0, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
+    if !has_right && has_top && has_bottom && has_left {
+        commands.entity(parent).with_children(|parent| {
+            parent
+                .spawn((
+                    Sprite::from_color(mask_color, Vec2::new(half_cell, CELL_SIZE as f32)),
+                    Transform::from_xyz(-inner_offset, 0.0, 0.1),
+                ))
+                .insert(MaskOverlay);
+        });
+    }
 }
