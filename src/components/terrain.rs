@@ -100,11 +100,7 @@ pub const MAP_SIZE: i32 = 8;
 pub const CELL_SIZE: i32 = 64;
 pub const VEC2_CELL_SIZE: Vec2 = Vec2::new(CELL_SIZE as f32, CELL_SIZE as f32);
 
-pub const MARS_GROUND_COLOR: Color = Color::srgb(
-    192.0 / 255.0,
-    122.0 / 255.0,
-    91.0 / 255.0,
-);
+pub const MARS_GROUND_COLOR: Color = Color::srgb(192.0 / 255.0, 122.0 / 255.0, 91.0 / 255.0);
 
 // Directions pour le voisinage (bits 0-7 pour les 8 directions)
 // Format: Bit 0 = Droite, 1 = Haut-Droite, 2 = Haut, 3 = Haut-Gauche,
@@ -153,12 +149,21 @@ impl SolidObject {
                 return material_def.sprites.get("alone").cloned();
             }
 
-            let sprite_name = self.get_sprite_name();
+            let full_neighbors = NEIGHBOR_RIGHT
+                | NEIGHBOR_TOP_RIGHT
+                | NEIGHBOR_TOP
+                | NEIGHBOR_TOP_LEFT
+                | NEIGHBOR_LEFT
+                | NEIGHBOR_BOTTOM_LEFT
+                | NEIGHBOR_BOTTOM
+                | NEIGHBOR_BOTTOM_RIGHT;
 
-            // TODO: Voir comment gérer l'intérieur des structures
-            if sprite_name == "top-left-bottom-right" {
-                //return Some(create_solid_color_sprite(material_def.color));
+            if self.neighbors_pattern == full_neighbors {
+                // The bloc is completly surronded by other blocs
+                return None;
             }
+
+            let sprite_name = self.get_sprite_name();
 
             if let Some(sprite) = material_def.sprites.get(&sprite_name) {
                 return Some(sprite.clone());
@@ -166,20 +171,17 @@ impl SolidObject {
 
             return material_def.sprites.get("alone").cloned();
         }
-
         None
     }
 
-    // Convertit le pattern de voisinage en nom de fichier de sprite
+    /// This method returns the sprite name to use for the solid object based on its neighbors.
     fn get_sprite_name(&self) -> String {
         let pattern = self.neighbors_pattern;
 
-        // Vérifier si c'est un bloc seul (pas de voisins)
         if pattern == 0 {
             return "alone".to_string();
         }
 
-        // Créer le nom basé sur les voisins présents
         let mut parts = Vec::new();
 
         if pattern & NEIGHBOR_TOP != 0 {

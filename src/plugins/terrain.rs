@@ -352,10 +352,15 @@ fn update_material_textures(
 ) {
     for (entity, solid_object) in solid_objects.iter() {
         if let Some(texture) = solid_object.get_texture(&world_materials) {
-            // L'ancien sprite est remplacé par le nouveau
             let mut sprite = Sprite::from_image(texture);
             sprite.custom_size = Some(VEC2_CELL_SIZE);
             commands.entity(entity).insert(sprite);
+        } else {
+            // In case the bloc is completely surrounded by other blocs, we create a plain color sprite
+            if let Some(material_def) = world_materials.materials.get(&solid_object.material_id) {
+                let sprite = Sprite::from_color(material_def.color, VEC2_CELL_SIZE);
+                commands.entity(entity).insert(sprite);
+            }
         }
     }
 }
