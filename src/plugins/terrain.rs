@@ -377,6 +377,8 @@ fn update_material_textures(
     mut commands: Commands,
     solid_objects: Query<(Entity, &SolidObject), Changed<SolidObject>>,
     world_materials: Res<WorldMaterials>,
+    children_query: Query<&Children>,
+    mask_overlay_query: Query<(), With<MaskOverlay>>,
 ) {
     for (entity, solid_object) in solid_objects.iter() {
         let material_def = match world_materials.materials.get(&solid_object.material_id) {
@@ -384,7 +386,6 @@ fn update_material_textures(
             None => continue,
         };
 
-        // Mise à jour du sprite principal (texture ou couleur pleine)
         if let Some(texture) = solid_object.get_texture(&world_materials) {
             let mut sprite = Sprite::from_image(texture);
             sprite.custom_size = Some(VEC2_CELL_SIZE);
@@ -394,11 +395,8 @@ fn update_material_textures(
             commands.entity(entity).insert(sprite);
         }
 
-        // Ici, on peut supprimer d'anciennes entités enfants portant le marqueur MaskOverlay
-        // (par exemple, en itérant sur les enfants connus et en les désactivant ou en les supprimant)
-        // Pour la simplicité, nous ne détaillons pas ici la logique de suppression.
+        remove_mask_overlays_from_parent(entity, &mut commands, &children_query, &mask_overlay_query);
 
-        // Ensuite, si le bloc est mergeable (donc susceptible de nécessiter des masques), on ajoute les overlays.
         if solid_object.mergeable {
             spawn_border_masks(
                 &mut commands,
@@ -406,6 +404,21 @@ fn update_material_textures(
                 material_def.color,
                 solid_object.neighbors_pattern,
             );
+        }
+    }
+}
+
+fn remove_mask_overlays_from_parent(
+    parent: Entity,
+    mut commands: &mut Commands,
+    children_query: &Query<&Children>,
+    mask_overlay_query: &Query<(), With<MaskOverlay>>,
+) {
+    if let Ok(children) = children_query.get(parent) {
+        for &child in children.iter() {
+            if mask_overlay_query.get(child).is_ok() {
+                commands.entity(child).despawn_recursive();
+            }
         }
     }
 }
