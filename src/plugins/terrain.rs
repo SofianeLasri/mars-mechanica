@@ -18,15 +18,11 @@ impl Plugin for TerrainPlugin {
             .add_event::<UpdateTerrainEvent>()
             .add_systems(PreStartup, init_world_definitions)
             .add_systems(
-                PostStartup,
-                (update_neighbors_pattern, update_material_textures),
-            )
-            .add_systems(
                 FixedUpdate,
                 (
                     update_solid_objects,
                     update_neighbors_pattern.run_if(on_event::<UpdateTerrainEvent>),
-                    update_material_textures.run_if(on_event::<UpdateTerrainEvent>),
+                    update_material_textures.run_if(on_event::<UpdateTerrainEvent>).after(update_neighbors_pattern),
                 ),
             );
     }
@@ -380,6 +376,7 @@ fn update_material_textures(
     children_query: Query<&Children>,
     mask_overlay_query: Query<(), With<MaskOverlay>>,
 ) {
+    info!("Update material textures");
     for (entity, solid_object) in solid_objects.iter() {
         let material_def = match world_materials.materials.get(&solid_object.material_id) {
             Some(mat) => mat,
@@ -406,11 +403,12 @@ fn update_material_textures(
             );
         }
     }
+    info!("Material textures updated");
 }
 
 fn remove_mask_overlays_from_parent(
     parent: Entity,
-    mut commands: &mut Commands,
+    commands: &mut Commands,
     children_query: &Query<&Children>,
     mask_overlay_query: &Query<(), With<MaskOverlay>>,
 ) {
