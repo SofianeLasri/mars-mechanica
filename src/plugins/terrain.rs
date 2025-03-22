@@ -208,7 +208,7 @@ fn update_solid_objects(
                     let item_entity = commands.spawn((
                         Sprite {
                             image: entity_def.icon.clone(),
-                            custom_size: Some(Vec2::splat(32.0)),
+                            custom_size: Some(Vec2::splat(64.0)),
                             ..Default::default()
                         },
                         Transform::from_translation(transform.translation),
