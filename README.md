@@ -22,3 +22,9 @@ Les valeurs à "tweaker" sont dans le fichier `src/components/terrain.rs`.
 - La destruction d'un bloc n'efface pas tous les sprites de masquage.
 - Les performances sont mauvaises sur des mondes dépassant les 100 x 100 blocs (même si c'est mieux depuis la mise en
   place des chunks).
+
+## Crédits
+
+- [Rust](https://www.rust-lang.org/)
+- [Bevy](https://bevyengine.org/)
+- Textures provenant du jeu [Rimworld](https://rimworldgame.com/)
