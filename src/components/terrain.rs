@@ -1,6 +1,6 @@
 use bevy::prelude::*;
+use bevy::sprite::Anchor;
 use std::collections::{HashMap, HashSet};
-
 // --- COMPOSANTS ---
 
 #[derive(Component)]
@@ -38,6 +38,12 @@ pub struct HoverState {
 
 #[derive(Component)]
 pub struct MaskOverlay;
+
+#[derive(Component)]
+pub struct ItemText;
+
+#[derive(Component)]
+pub struct TextAnchor(Anchor);
 
 // --- RESSOURCES ---
 
@@ -213,7 +219,6 @@ pub struct ChunkUtils;
 impl ChunkUtils {
     /// Convert world coordinates to chunk coordinates
     pub fn world_to_chunk_coords(x: i32, y: i32) -> (i32, i32) {
-        /// Usage of euclidean division to handle negative numbers correctly
         let chunk_x = if x < 0 && x % CHUNK_SIZE != 0 {
             (x / CHUNK_SIZE) - 1
         } else {
@@ -238,5 +243,11 @@ impl ChunkUtils {
             }
         }
         neighbors
+    }
+}
+
+impl Default for TextAnchor {
+    fn default() -> Self {
+        Self(Anchor::Center)
     }
 }

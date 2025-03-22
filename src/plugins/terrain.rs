@@ -1,10 +1,7 @@
-use crate::components::{
-    ChunkMap, ChunkUtils, EntityDefinition, MaskOverlay, MaterialDefinition, SolidObject, UpdateTerrainEvent,
-    WorldEntities, WorldMaterials, CELL_SIZE, CHUNK_SIZE,
-    MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT,
-    NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE,
-};
+use crate::components::{ChunkMap, ChunkUtils, ControlledCamera, EntityDefinition, ItemText, MaskOverlay, MaterialDefinition, SolidObject, UpdateTerrainEvent, WorldEntities, WorldEntityItem, WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE};
 use bevy::prelude::*;
+use bevy::text::{JustifyText, TextColor, TextFont, TextLayout};
+use bevy_sprite::Anchor;
 use rand::Rng;
 use std::collections::{HashMap, HashSet};
 
@@ -25,6 +22,7 @@ impl Plugin for TerrainPlugin {
                     update_material_textures
                         .run_if(on_event::<UpdateTerrainEvent>)
                         .after(update_neighbors_pattern),
+                    update_item_text_visibility
                 ),
             );
     }
@@ -193,13 +191,13 @@ fn update_solid_objects(
     world_materials: Res<WorldMaterials>,
     world_entities: Res<WorldEntities>,
     mut chunk_map: ResMut<ChunkMap>,
+    asset_server: Res<AssetServer>
 ) {
     for (entity, solid_object, transform) in solid_objects.iter() {
         if solid_object.health <= 0.0 {
             // Logique pour faire apparaître des items lorsqu'un objet est détruit
             if let Some(material) = world_materials.materials.get(&solid_object.material_id) {
-                if let Some(_entity_def) = world_entities.entities.get(&material.drop_entity_id) {
-                    // Déterminer combien d'objets vont être droppés
+                if let Some(entity_def) = world_entities.entities.get(&material.drop_entity_id) {
                     let drop_count = if material.drop_count_min == material.drop_count_max {
                         material.drop_count_min
                     } else {
@@ -207,12 +205,45 @@ fn update_solid_objects(
                         rng.gen_range(material.drop_count_min..=material.drop_count_max)
                     };
 
-                    // Logique pour créer les items drops
-                    // ...
+                    let item_entity = commands.spawn((
+                        Sprite {
+                            image: entity_def.icon.clone(),
+                            custom_size: Some(Vec2::splat(32.0)),
+                            ..Default::default()
+                        },
+                        Transform::from_translation(transform.translation),
+                        Visibility::Visible,
+                        WorldEntityItem {
+                            entity_id: material.drop_entity_id.clone(),
+                            quantity: drop_count,
+                        },
+                    )).id();
+
+                    let text_position = Vec3::new(
+                        transform.translation.x,
+                        transform.translation.y - (CELL_SIZE as f32 / 2.0) + 10.0,
+                        transform.translation.z + 1.0,
+                    );
+
+                    let text = drop_count.to_string();
+
+                    commands.spawn((
+                        Text2d::new(text),
+                        TextFont {
+                            font: asset_server.load("fonts/inter-regular.ttf"),
+                            font_size: 14.0,
+                            ..Default::default()
+                        },
+                        TextColor(Color::WHITE),
+                        TextLayout::new_with_justify(JustifyText::Center),
+                        Anchor::BottomCenter,
+                        Transform::from_translation(text_position),
+                        Visibility::Hidden,
+                        ItemText,
+                    ));
                 }
             }
 
-            // Supprimer l'entité du chunk map
             let x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
             let y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
             let (chunk_x, chunk_y) = ChunkUtils::world_to_chunk_coords(x, y);
@@ -682,5 +713,24 @@ fn spawn_border_masks(
                 ))
                 .insert(MaskOverlay);
         });
+    }
+}
+
+/// This system updates the visibility of the item text based on the camera zoom level
+///
+/// If the camera zoom level is less than 1.0, the text is hidden.
+fn update_item_text_visibility(
+    camera_query: Query<&OrthographicProjection, With<ControlledCamera>>,
+    mut text_query: Query<&mut Visibility, With<ItemText>>,
+) {
+    if let Ok(projection) = camera_query.get_single() {
+        let zoom = projection.scale;
+        for mut visibility in text_query.iter_mut() {
+            *visibility = if zoom <= 1.5 {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            };
+        }
     }
 }

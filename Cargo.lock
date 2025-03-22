@@ -2554,6 +2554,7 @@ name = "mars-mechanica"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_sprite",
  "noise",
  "rand",
 ]
