@@ -21,8 +21,8 @@ pub fn generate_world(
                 &mut commands,
                 &mut chunk_map,
                 world_materials.as_ref(),
-                terrain_noise,
-                material_noise,
+                terrain_noise.clone(),
+                material_noise.clone(),
                 chunk_x,
                 chunk_y,
             );
@@ -37,7 +37,7 @@ pub fn generate_world(
     });
 }
 
-/// Genereates a chunk of terrain with its cells and solid objects
+/// Generates a chunk of terrain with its cells and solid objects
 fn generate_chunk(
     commands: &mut Commands,
     chunk_map: &mut ChunkMap,
@@ -49,88 +49,92 @@ fn generate_chunk(
 ) {
     chunk_map.chunks.insert((chunk_x, chunk_y), HashSet::new());
 
+    let radius = (MAP_SIZE * CHUNK_SIZE) / 2;
+    let radius_sq = radius.pow(2);
+
     for local_x in 0..CHUNK_SIZE {
         for local_y in 0..CHUNK_SIZE {
             let world_x = chunk_x * CHUNK_SIZE + local_x;
             let world_y = chunk_y * CHUNK_SIZE + local_y;
 
+            let distance_sq = world_x.pow(2) + world_y.pow(2);
+
+            // Skip cells outside the circular area
+            if distance_sq > radius_sq {
+                continue;
+            }
+
             let (coord_x, coord_y) = calc_cell_coordinates(&world_x, &world_y);
 
-            let mut sprite = Sprite::from_color(
-                MARS_GROUND_COLOR,
-                VEC2_CELL_SIZE,
-            );
-
+            // Generate ground cell
             commands.spawn((
-                sprite,
+                Sprite::from_color(MARS_GROUND_COLOR, VEC2_CELL_SIZE),
                 Transform::from_xyz(coord_x as f32, coord_y as f32, 0.0),
                 TerrainCell { x: world_x, y: world_y },
                 TerrainChunk { chunk_x, chunk_y },
             ));
 
-            // Utilise le bruit de Perlin pour déterminer s'il faut placer un objet solide
-            let noise_value = terrain_noise.get([world_x as f64 * 0.1, world_y as f64 * 0.1]) as f32;
+            // Determine if current cell is on the border
+            let is_border = is_border_cell(world_x, world_y, radius_sq);
 
-            // Détermine si on place un objet ici (50% des cellules ont des objets)
-            if noise_value > 0.0 {
-                // Détermine le type de matériau en fonction d'un autre bruit de Perlin
-                let material_value = material_noise.get([world_x as f64 * 0.2, world_y as f64 * 0.2]) as f32;
-
-                let material_id = if material_value > 0.7 {
-                    // Olivine (10% de chance)
-                    "olivine"
-                } else if material_value > 0.4 {
-                    // Basalt (30% de chance)
-                    "basalt"
-                } else {
-                    // Roche martienne (60% de chance)
-                    "rock"
-                };
-
-                if world_materials.materials.len() == 0 {
-                    error!("No materials in the world materials");
+            let material_id = if is_border {
+                "rock".to_string()
+            } else {
+                // Use noise for internal cells
+                let noise_value = terrain_noise.get([world_x as f64 * 0.1, world_y as f64 * 0.1]) as f32;
+                if noise_value <= 0.0 {
                     continue;
                 }
 
-                let material_def = world_materials.materials.get(material_id).unwrap();
-                let mergeable = material_def.can_be_merged;
-
-                let health = match material_id {
-                    "olivine" => 8.0,
-                    "basalt" => 5.0,
-                    "rock" => 3.0,
-                    _ => 1.0,
-                };
-
-                let mut sprite = Sprite::from_color(
-                    material_def.color,
-                    VEC2_CELL_SIZE,
-                );
-                sprite.custom_size = Some(VEC2_CELL_SIZE);
-
-                let entity = commands.spawn((
-                    sprite,
-                    Transform::from_xyz(coord_x as f32, coord_y as f32, 1.0),
-                    SolidObject {
-                        material_id: material_id.to_string(),
-                        health,
-                        max_health: health,
-                        mergeable,
-                        neighbors_pattern: 0, // Will be calculated later
-                    },
-                    TerrainChunk { chunk_x, chunk_y },
-                )).id();
-
-                if let Some(chunk_entities) = chunk_map.chunks.get_mut(&(chunk_x, chunk_y)) {
-                    chunk_entities.insert(entity);
+                let material_value = material_noise.get([world_x as f64 * 0.2, world_y as f64 * 0.2]) as f32;
+                if material_value > 0.7 {
+                    "olivine".to_string()
+                } else if material_value > 0.4 {
+                    "basalt".to_string()
+                } else {
+                    "rock".to_string()
                 }
+            };
+
+            let material_def = world_materials.materials.get(&material_id).unwrap();
+
+            let entity = commands.spawn((
+                Sprite::from_color(material_def.color, VEC2_CELL_SIZE),
+                Transform::from_xyz(coord_x as f32, coord_y as f32, 1.0),
+                SolidObject {
+                    material_id: material_id.clone(),
+                    health: material_def.strength,
+                    max_health: material_def.strength,
+                    mergeable: material_def.can_be_merged,
+                    neighbors_pattern: 0,
+                },
+                TerrainChunk { chunk_x, chunk_y },
+            )).id();
+
+            if let Some(chunk_entities) = chunk_map.chunks.get_mut(&(chunk_x, chunk_y)) {
+                chunk_entities.insert(entity);
             }
         }
     }
 }
 
+/// Checks if a cell is on the circular border by verifying its neighbors
+fn is_border_cell(world_x: i32, world_y: i32, radius_sq: i32) -> bool {
+    for dx in -1..=1 {
+        for dy in -1..=1 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            let nx = world_x + dx;
+            let ny = world_y + dy;
+            if nx.pow(2) + ny.pow(2) > radius_sq {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 pub fn calc_cell_coordinates(x: &i32, y: &i32) -> (i32, i32) {
-    let cell_x = x * CELL_SIZE;
-    let cell_y = y * CELL_SIZE;
-    (cell_x, cell_y)
+    (x * CELL_SIZE, y * CELL_SIZE)
 }
