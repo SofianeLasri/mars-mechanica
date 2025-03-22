@@ -97,7 +97,7 @@ pub const CHUNK_SIZE: i32 = 16;
 /// Example: 8 = 8x16 = 128 blocks in each direction
 ///
 /// **NOTE:** Any value above 8 will cause an exponential performance drop
-pub const MAP_SIZE: i32 = 8;
+pub const MAP_SIZE: i32 = 6;
 
 /// Size of each block in pixels with 100% OS scaling.
 pub const CELL_SIZE: i32 = 80;
