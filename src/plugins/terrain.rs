@@ -22,7 +22,9 @@ impl Plugin for TerrainPlugin {
                 (
                     update_solid_objects,
                     update_neighbors_pattern.run_if(on_event::<UpdateTerrainEvent>),
-                    update_material_textures.run_if(on_event::<UpdateTerrainEvent>).after(update_neighbors_pattern),
+                    update_material_textures
+                        .run_if(on_event::<UpdateTerrainEvent>)
+                        .after(update_neighbors_pattern),
                 ),
             );
     }
@@ -66,7 +68,7 @@ fn init_world_definitions(
             drop_count_min: 1,
             drop_count_max: 2,
             can_be_merged: true,
-            rarity: 0.3, // Assez rare
+            rarity: 0.6, // Assez rare
             sprites: load_material_sprites(&asset_server, "basalt"),
             color: Color::srgb(47.0 / 255.0, 47.0 / 255.0, 47.0 / 255.0), // #2F2F2F
         },
@@ -80,10 +82,25 @@ fn init_world_definitions(
             drop_entity_id: "olivine_item".to_string(),
             drop_count_min: 1,
             drop_count_max: 1,
-            can_be_merged: false, // Apparaît toujours comme des cristaux individuels
-            rarity: 0.7,          // Très rare
+            can_be_merged: true, // Apparaît toujours comme des cristaux individuels
+            rarity: 0.8,         // Très rare
             sprites: load_material_sprites(&asset_server, "olivine"),
             color: Color::srgb(33.0 / 255.0, 72.0 / 255.0, 40.0 / 255.0), // #214828
+        },
+    );
+
+    materials.insert(
+        "red_crystal".to_string(),
+        MaterialDefinition {
+            name: "Red crystal".to_string(),
+            strength: 4.0,
+            drop_entity_id: "red_crystal_item".to_string(),
+            drop_count_min: 1,
+            drop_count_max: 1,
+            can_be_merged: false, // Apparaît toujours comme des cristaux individuels
+            rarity: 0.95,         // Très très rare
+            sprites: load_material_sprites(&asset_server, "red_crystal"),
+            color: Color::srgb(189.0 / 255.0, 36.0 / 255.0, 36.0 / 255.0), // #bd2424
         },
     );
 
@@ -117,6 +134,15 @@ fn init_world_definitions(
             name: "Olivine Crystal".to_string(),
             icon: asset_server.load("textures/items/olivine.png"),
             max_stack: 16,
+        },
+    );
+
+    entities.insert(
+        "red_crystal_item".to_string(),
+        EntityDefinition {
+            name: "Red Crystal".to_string(),
+            icon: asset_server.load("textures/items/red_crystal.png"),
+            max_stack: 8,
         },
     );
 
@@ -392,7 +418,12 @@ fn update_material_textures(
             commands.entity(entity).insert(sprite);
         }
 
-        remove_mask_overlays_from_parent(entity, &mut commands, &children_query, &mask_overlay_query);
+        remove_mask_overlays_from_parent(
+            entity,
+            &mut commands,
+            &children_query,
+            &mask_overlay_query,
+        );
 
         if solid_object.mergeable {
             spawn_border_masks(

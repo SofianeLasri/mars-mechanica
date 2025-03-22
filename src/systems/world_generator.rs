@@ -87,9 +87,11 @@ fn generate_chunk(
                 }
 
                 let material_value = material_noise.get([world_x as f64 * 0.2, world_y as f64 * 0.2]) as f32;
-                if material_value > 0.7 {
+                if material_value > 0.95 {
+                    "red_crystal".to_string()
+                } else if material_value > 0.8 {
                     "olivine".to_string()
-                } else if material_value > 0.4 {
+                } else if material_value > 0.6 {
                     "basalt".to_string()
                 } else {
                     "rock".to_string()
