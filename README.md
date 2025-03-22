@@ -11,3 +11,14 @@ pour survivre et accomplir des objectifs.
 ## Information
 
 Les valeurs à "tweaker" sont dans le fichier `src/components/terrain.rs`.
+
+## Problèmes connus
+
+- Le système de chunk casse le terrain en le coupant aux extrémités de la zone actualisée (lors d'une action).
+- L'algorithme de placement des sprites, gérant la détection des blocs voisins et le masquage des bordures n'est pas
+  terminé. Le modèle actuel est très "manuel" et peu efficace. Certaines jointures entre certains patterns ne sont pas
+  correctes, voir manquantes.
+- Il faut parfois double cliquer pour détruire un bloc.
+- La destruction d'un bloc n'efface pas tous les sprites de masquage.
+- Les performances sont mauvaises sur des mondes dépassant les 100 x 100 blocs (même si c'est mieux depuis la mise en
+  place des chunks).
