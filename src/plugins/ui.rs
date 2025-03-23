@@ -1,5 +1,5 @@
 use crate::components::{
-    ButtonAction, LoadingText, MenuButton, MenuButtonComponent, MenuRoot, BUTTON_HOVER_COLOR,
+    ButtonAction, LoadingText, MenuButton, MenuRoot, BUTTON_HOVER_COLOR,
     SIDEBAR_COLOR, TEXT_COLOR,
 };
 use crate::GameState;

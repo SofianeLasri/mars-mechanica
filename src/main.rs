@@ -2,7 +2,7 @@ mod components;
 mod plugins;
 mod systems;
 
-use crate::plugins::game::{GamePlugin, WorldGenState};
+use crate::plugins::game::GamePlugin;
 use crate::plugins::splash::SplashPlugin;
 use crate::plugins::ui::UiPlugin;
 use bevy::prelude::*;
@@ -30,7 +30,6 @@ fn main() {
         )
         .insert_resource(ClearColor(Color::BLACK))
         .init_state::<GameState>()
-        .init_resource::<WorldGenState>()
         .add_plugins((SplashPlugin, UiPlugin, GamePlugin))
         .run();
 }

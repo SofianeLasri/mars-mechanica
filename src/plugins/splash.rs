@@ -5,7 +5,8 @@ use bevy::prelude::*;
 
 #[derive(Resource, Default)]
 struct SplashAssets {
-    handles: Vec<Handle<Image>>,
+    image_handles: Vec<Handle<Image>>,
+    intro_audio: Handle<AudioSource>,
 }
 
 #[derive(Resource)]
@@ -48,7 +49,8 @@ fn load_splash_assets(asset_server: Res<AssetServer>, mut splash_assets: ResMut<
         let handle = asset_server.load(path);
         handles.push(handle);
     }
-    splash_assets.handles = handles;
+    splash_assets.image_handles = handles;
+    splash_assets.intro_audio = asset_server.load("sounds/intro.ogg")
 }
 
 fn check_assets_loaded(
@@ -57,7 +59,7 @@ fn check_assets_loaded(
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     let mut finished_loading = true;
-    for handle in &splash_assets.handles {
+    for handle in &splash_assets.image_handles {
         let load_state = asset_server.get_load_state(handle).unwrap();
         if let LoadState::Loaded = load_state {
             continue;
@@ -66,6 +68,14 @@ fn check_assets_loaded(
             break;
         }
     }
+
+    let load_state = asset_server.get_load_state(&splash_assets.intro_audio).unwrap();
+    if let LoadState::Loaded = load_state {
+        // Do nothing
+    } else {
+        finished_loading = false;
+    }
+
     if finished_loading {
         info!("All splash assets loaded");
         next_state.set(GameState::SplashScreen);
@@ -74,6 +84,7 @@ fn check_assets_loaded(
 
 fn setup_splash(mut commands: Commands, splash_assets: Res<SplashAssets>) {
     commands.spawn((Camera2d::default(), UiCamera));
+    commands.spawn(AudioPlayer::new(splash_assets.intro_audio.clone()));
 
     // Création d'un parent pour tous les calques
     let mut splash_parent = commands.spawn((
@@ -85,7 +96,7 @@ fn setup_splash(mut commands: Commands, splash_assets: Res<SplashAssets>) {
         SplashScreen,
     ));
 
-    for (i, handle) in splash_assets.handles.iter().enumerate() {
+    for (i, handle) in splash_assets.image_handles.iter().enumerate() {
         splash_parent.with_children(|parent| {
             parent.spawn((
                 ImageNode::from(handle.clone()),

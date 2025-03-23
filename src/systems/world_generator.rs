@@ -1,5 +1,4 @@
 use crate::components::terrain::*;
-use crate::plugins::game::WorldGenState;
 use crate::GameState;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
@@ -13,7 +12,6 @@ pub fn generate_world(
     mut chunk_map: ResMut<ChunkMap>,
     mut event_writer: EventWriter<UpdateTerrainEvent>,
     mut next_state: ResMut<NextState<GameState>>,
-    mut state: ResMut<WorldGenState>,
 ) {
     let terrain_noise = Perlin::new(random());
     let material_noise = Perlin::new(random());
