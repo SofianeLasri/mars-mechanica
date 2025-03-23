@@ -1,5 +1,5 @@
 use crate::components::{
-    ButtonAction, LoadingText, MenuButton, MenuButtonComponent, MenuComponent, MenuRoot,
+    ButtonAction, LoadingText, MenuButton, MenuButtonComponent, MenuRoot, BUTTON_HOVER_COLOR,
     SIDEBAR_COLOR, TEXT_COLOR,
 };
 use crate::GameState;
@@ -9,10 +9,10 @@ pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::MainMenu), setup_main_menu);
-        /*    .add_systems(OnExit(GameState::MainMenu), cleanup_menu)
-        .add_systems(OnEnter(GameState::Loading), setup_loading_screen)*/
-        //.add_systems(FixedUpdate, (handle_menu_buttons, handle_loading));
+        app.add_systems(OnEnter(GameState::MainMenu), setup_main_menu)
+            .add_systems(OnExit(GameState::MainMenu), cleanup_menu)
+            .add_systems(OnEnter(GameState::Loading), setup_loading_screen)
+            .add_systems(FixedUpdate, (handle_menu_buttons, handle_loading));
     }
 }
 
@@ -79,12 +79,12 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         ..default()
     };
 
-    let button_node = Node {
+    let button_node = (Node {
         flex_direction: FlexDirection::Row,
         align_items: AlignItems::Center,
         padding: UiRect::new(Val::Px(16.0), Val::Px(16.0), Val::Px(8.0), Val::Px(8.0)),
         ..default()
-    };
+    }, Button);
 
     let buttons_sub_container = Node {
         flex_direction: FlexDirection::Column,
@@ -94,7 +94,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         menu_root_node,
         background_image_node,
-        MenuComponent,
+        MenuRoot,
         children![(
             side_bar,
             children![
@@ -122,7 +122,9 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                                         (
                                             button_node.clone(),
                                             BackgroundColor(Color::NONE.into()),
-                                            MenuButtonComponent,
+                                            MenuButton {
+                                                action: ButtonAction::GenerateWorld
+                                            },
                                             children![compute_button(
                                                 "Créer un monde",
                                                 &asset_server
@@ -131,7 +133,9 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                                         (
                                             button_node.clone(),
                                             BackgroundColor(Color::NONE.into()),
-                                            MenuButtonComponent,
+                                            MenuButton {
+                                                action: ButtonAction::LoadSeed
+                                            },
                                             children![compute_button(
                                                 "Charger une seed",
                                                 &asset_server
@@ -145,13 +149,17 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                                         (
                                             button_node.clone(),
                                             BackgroundColor(Color::NONE.into()),
-                                            MenuButtonComponent,
+                                            MenuButton {
+                                                action: ButtonAction::Settings
+                                            },
                                             children![compute_button("Paramètres", &asset_server)]
                                         ),
                                         (
                                             button_node.clone(),
                                             BackgroundColor(Color::NONE.into()),
-                                            MenuButtonComponent,
+                                            MenuButton {
+                                                action: ButtonAction::Credits
+                                            },
                                             children![compute_button("Crédits", &asset_server)]
                                         )
                                     ]
@@ -161,7 +169,9 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                         (
                             button_node.clone(),
                             BackgroundColor(Color::NONE.into()),
-                            MenuButtonComponent,
+                            MenuButton {
+                                action: ButtonAction::Quit
+                            },
                             children![compute_button("Quitter", &asset_server)]
                         )
                     ]
@@ -169,38 +179,6 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
             ],
         )],
     ));
-
-    /*commands.spawn(menu_root).with_children(|parent| {
-        // Barre latérale
-        parent.spawn(side_bar).with_children(|sidebar| {
-            // Titre
-            sidebar.spawn((game_title, game_author));
-
-            // Conteneur des boutons
-            sidebar
-                .spawn(buttons_container)
-                .with_children(|buttons_container| {
-                    // Première colonne de boutons
-                    buttons_container
-                        .spawn(buttons_sub_container.clone())
-                        .with_children(|col1| {
-                            spawn_menu_button(col1, "Créer un monde", &asset_server);
-                            spawn_menu_button(col1, "Charger une seed", &asset_server);
-                        });
-
-                    // Deuxième colonne de boutons
-                    buttons_container
-                        .spawn(buttons_sub_container.clone())
-                        .with_children(|col2| {
-                            spawn_menu_button(col2, "Paramètres", &asset_server);
-                            spawn_menu_button(col2, "Crédits", &asset_server);
-                        });
-
-                    // Bouton Quitter
-                    spawn_menu_button(buttons_container, "Quitter", &asset_server);
-                });
-        });
-    });*/
 }
 
 fn compute_button(text: &str, asset_server: &Res<AssetServer>) -> (Text, TextFont, TextColor) {
@@ -216,36 +194,7 @@ fn compute_button(text: &str, asset_server: &Res<AssetServer>) -> (Text, TextFon
     )
 }
 
-/*fn spawn_menu_button(parent: &mut ChildBuilder, text: &str, asset_server: &Res<AssetServer>) {
-    let button_node = Node {
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::Center,
-        ..default()
-    };
-
-    let button_text = (
-        Text::new(text),
-        TextFont {
-            font: asset_server.load("fonts/inter-regular.ttf"),
-            font_size: 24.0,
-            line_height: Default::default(),
-            font_smoothing: Default::default(),
-        },
-        TextColor(TEXT_COLOR),
-    );
-
-    parent
-        .spawn((
-            button_node,
-            BackgroundColor(Color::NONE.into()),
-            MenuButtonComponent,
-        ))
-        .with_children(|button| {
-            button.spawn(button_text);
-        });
-}*/
-
-/*fn handle_menu_buttons(
+fn handle_menu_buttons(
     mut interaction_query: Query<
         (&Interaction, &MenuButton, &mut BackgroundColor),
         Changed<Interaction>,
@@ -256,19 +205,19 @@ fn compute_button(text: &str, asset_server: &Res<AssetServer>) -> (Text, TextFon
     for (interaction, button, mut color) in &mut interaction_query {
         match interaction {
             Interaction::Pressed => {
-                *color = BUTTON_PRESS.into();
+                *color = BUTTON_HOVER_COLOR.into();
 
-                if let ButtonAction::Play = button.action {
+                if let ButtonAction::GenerateWorld = button.action {
                     next_state.set(GameState::Loading)
-                } else {
+                } else if let ButtonAction::Quit = button.action {
                     app_exit.send(AppExit::Success);
                 }
             }
-            Interaction::Hovered => *color = BUTTON_HOVER.into(),
-            Interaction::None => *color = BUTTON_COLOR.into(),
+            Interaction::Hovered => *color = BUTTON_HOVER_COLOR.into(),
+            Interaction::None => *color = Color::NONE.into(),
         }
     }
-}*/
+}
 
 fn setup_loading_screen(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
@@ -306,6 +255,6 @@ fn handle_loading(
 
 pub fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuRoot>>) {
     for entity in &query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }

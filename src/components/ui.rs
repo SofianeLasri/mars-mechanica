@@ -13,7 +13,10 @@ pub struct MenuButton {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ButtonAction {
-    Play,
+    GenerateWorld,
+    LoadSeed,
+    Credits,
+    Settings,
     Quit,
 }
 
