@@ -10,6 +10,7 @@ use bevy::prelude::*;
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
 enum GameState {
     #[default]
+    AssetLoading,
     SplashScreen,
     MainMenu,
     Loading,
@@ -27,7 +28,7 @@ fn main() {
                 ..Default::default()
             })
         )
-        .insert_resource(ClearColor(Color::BLACK))
+        .insert_resource(ClearColor(Color::WHITE))
         .init_state::<GameState>()
         .init_resource::<WorldGenState>()
         .add_plugins((SplashPlugin, UiPlugin, GamePlugin))
