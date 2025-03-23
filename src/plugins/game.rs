@@ -18,6 +18,6 @@ impl Plugin for GamePlugin {
             DebugTextPlugin,
             InteractionPlugin,
         ))
-            .add_systems(OnEnter(GameState::Loading), (generate_world));
+            .add_systems(OnEnter(GameState::Loading), generate_world);
     }
 }

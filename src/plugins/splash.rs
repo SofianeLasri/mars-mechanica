@@ -58,35 +58,22 @@ fn check_assets_loaded(
     splash_assets: Res<SplashAssets>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    let mut finished_loading = true;
-    for handle in &splash_assets.image_handles {
-        let load_state = asset_server.get_load_state(handle).unwrap();
-        if let LoadState::Loaded = load_state {
-            continue;
-        } else {
-            finished_loading = false;
-            break;
-        }
-    }
+    let images_loaded = splash_assets.image_handles.iter().all(|handle| {
+        matches!(asset_server.get_load_state(handle).unwrap(), LoadState::Loaded)
+    });
 
-    let load_state = asset_server.get_load_state(&splash_assets.intro_audio).unwrap();
-    if let LoadState::Loaded = load_state {
-        // Do nothing
-    } else {
-        finished_loading = false;
-    }
+    let audio_loaded = matches!(
+        asset_server.get_load_state(&splash_assets.intro_audio).unwrap(),
+        LoadState::Loaded
+    );
 
-    if finished_loading {
+    if images_loaded && audio_loaded {
         info!("All splash assets loaded");
         next_state.set(GameState::SplashScreen);
     }
 }
 
 fn setup_splash(mut commands: Commands, splash_assets: Res<SplashAssets>) {
-    commands.spawn((Camera2d::default(), UiCamera));
-    commands.spawn(AudioPlayer::new(splash_assets.intro_audio.clone()));
-
-    // Création d'un parent pour tous les calques
     let mut splash_parent = commands.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -122,6 +109,9 @@ fn setup_splash(mut commands: Commands, splash_assets: Res<SplashAssets>) {
         current_frame: 0,
         timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
     });
+
+    commands.spawn((Camera2d::default(), UiCamera));
+    commands.spawn(AudioPlayer::new(splash_assets.intro_audio.clone()));
 }
 
 fn update_splash(
