@@ -18,12 +18,10 @@ impl Plugin for UiPlugin {
 }
 
 #[derive(Component)]
-struct UiCamera;
+pub(crate) struct UiCamera;
 
 fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     info!("Setting up main menu");
-
-    commands.spawn((Camera2d, UiCamera));
 
     let menu_root_node = Node {
         width: Val::Percent(100.0),
@@ -32,15 +30,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         ..default()
     };
 
-    let background_image_node = ImageNode {
-        color: Default::default(),
-        image: asset_server.load("textures/background.png"),
-        texture_atlas: None,
-        flip_x: false,
-        flip_y: false,
-        rect: None,
-        image_mode: Default::default(),
-    };
+    let background_image_node = ImageNode::from(asset_server.load("textures/background.png"));
 
     let side_bar = (
         Node {
