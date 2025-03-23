@@ -28,7 +28,7 @@ fn main() {
                 ..Default::default()
             })
         )
-        .insert_resource(ClearColor(Color::WHITE))
+        .insert_resource(ClearColor(Color::BLACK))
         .init_state::<GameState>()
         .init_resource::<WorldGenState>()
         .add_plugins((SplashPlugin, UiPlugin, GamePlugin))
