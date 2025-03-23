@@ -2,11 +2,16 @@ mod components;
 mod plugins;
 mod systems;
 
-use crate::plugins::{
-    CameraPlugin, DebugTextPlugin, EntityPlugin, InteractionPlugin, TerrainPlugin,
-};
-use crate::systems::generate_world;
+use crate::plugins::ui;
 use bevy::prelude::*;
+
+#[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
+enum GameState {
+    #[default]
+    MainMenu,
+    Loading,
+    InGame,
+}
 
 fn main() {
     App::new()
@@ -19,13 +24,12 @@ fn main() {
                 ..Default::default()
             })
         )
-        .add_plugins((
-            EntityPlugin,
-            CameraPlugin,
-            TerrainPlugin,
-            DebugTextPlugin,
-            InteractionPlugin,
-        ))
-        .add_systems(Startup, generate_world)
+        .init_state::<GameState>()
+        .add_systems(Startup, setup_camera)
+        .add_plugins((ui::UiPlugin))
         .run();
+}
+
+fn setup_camera(mut commands: Commands) {
+    commands.spawn(Camera2d);
 }

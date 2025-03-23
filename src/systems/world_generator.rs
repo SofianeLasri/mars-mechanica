@@ -1,4 +1,5 @@
 use crate::components::terrain::*;
+use crate::GameState;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::prelude::*;
@@ -8,7 +9,8 @@ pub fn generate_world(
     mut commands: Commands,
     world_materials: Res<WorldMaterials>,
     mut chunk_map: ResMut<ChunkMap>,
-    mut event_writer: EventWriter<UpdateTerrainEvent>
+    mut event_writer: EventWriter<UpdateTerrainEvent>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
     let terrain_noise = Perlin::new(random());
     let material_noise = Perlin::new(random());
@@ -35,6 +37,7 @@ pub fn generate_world(
         region: None,
         chunk_coords: None,
     });
+    next_state.set(GameState::InGame);
 }
 
 /// Generates a chunk of terrain with its cells and solid objects
