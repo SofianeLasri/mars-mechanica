@@ -30,7 +30,7 @@ pub fn init(mut commands: Commands) {
 
 pub fn update_camera(
     mut camera_query: Query<(
-        &mut OrthographicProjection,
+        &mut Projection,
         &mut Transform,
         &mut ControlledCamera,
     )>,
@@ -38,7 +38,7 @@ pub fn update_camera(
     mut mouse_wheel_events: EventReader<MouseWheel>,
     window_query: Query<&Window, With<PrimaryWindow>>,
 ) {
-    let (mut projection, transform, mut camera) = match camera_query.get_single_mut() {
+    let (mut projection, transform, mut camera) = match camera_query.single_mut() {
         Ok(result) => result,
         Err(_) => return,
     };
@@ -62,10 +62,21 @@ pub fn update_camera(
 }
 
 /// This method handle the zoom of the camera using the mouse wheel events
-fn handle_zoom(mouse_wheel_events: &mut EventReader<MouseWheel>, projection: &mut Mut<OrthographicProjection>, camera: &mut Mut<ControlledCamera>) {
+fn handle_zoom(
+    mouse_wheel_events: &mut EventReader<MouseWheel>,
+    projection: &mut Mut<Projection>,
+    camera: &mut Mut<ControlledCamera>,
+) {
     for event in mouse_wheel_events.read() {
         let zoom_delta = -event.y * camera.zoom_speed;
-        projection.scale = (projection.scale + zoom_delta).clamp(camera.min_zoom, camera.max_zoom);
+
+        // On déstructure la Projection pour accéder à la variante Orthographique
+        if let Projection::Orthographic(ortho_projection) = &mut **projection {
+            ortho_projection.scale = (ortho_projection.scale + zoom_delta)
+                .clamp(camera.min_zoom, camera.max_zoom);
+        } else {
+            warn!("The projection is not Orthographic");
+        }
     }
 }
 
@@ -90,21 +101,28 @@ fn handle_movement(window_query: Query<&Window, With<PrimaryWindow>>, mut transf
 
 /// This method returns the cursor position relative to the center of the window
 pub fn get_cursor_window_position(window_query: Query<&Window, With<PrimaryWindow>>) -> Vec2 {
-    let window = window_query.single();
+    let window = window_query.single().unwrap();
     let window_size = Vec2::new(window.width(), window.height());
     let cursor_position = window.cursor_position().unwrap_or(window_size / 2.0) - window_size / 2.0;
     cursor_position
 }
 
 /// This method returns the cursor position in the world coordinates
-pub fn get_cursor_world_position(window_query: Query<&Window, With<PrimaryWindow>>, camera_query: Query<(&Camera, &GlobalTransform, &OrthographicProjection)>) -> Vec2 {
+pub fn get_cursor_world_position(window_query: Query<&Window, With<PrimaryWindow>>, camera_query: Query<(&Camera, &GlobalTransform, &Projection)>) -> Vec2 {
     let cursor_position = get_cursor_window_position(window_query);
 
-    let (_camera, camera_transform, camera_projection) = camera_query.single();
+    let Ok((camera, transform, projection)) = camera_query.single() else {
+        return Vec2::ZERO;
+    };
 
-    let cursor_world_position = Vec2::new(
-        camera_transform.translation().x + cursor_position.x * camera_projection.scale,
-        camera_transform.translation().y - cursor_position.y * camera_projection.scale,
-    );
-    cursor_world_position
+    match projection {
+        Projection::Orthographic(ortho) => {
+            let translation = transform.translation();
+            Vec2::new(
+                translation.x + cursor_position.x * ortho.scale,
+                translation.y - cursor_position.y * ortho.scale,
+            )
+        }
+        _ => Vec2::ZERO
+    }
 }

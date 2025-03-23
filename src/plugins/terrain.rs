@@ -475,7 +475,7 @@ fn remove_mask_overlays_from_parent(
     mask_overlay_query: &Query<(), With<MaskOverlay>>,
 ) {
     if let Ok(children) = children_query.get(parent) {
-        for &child in children.iter() {
+        for child in children.iter() {
             if mask_overlay_query.get(child).is_ok() {
                 commands.entity(child).despawn_recursive();
             }
@@ -720,17 +720,19 @@ fn spawn_border_masks(
 ///
 /// If the camera zoom level is less than 1.0, the text is hidden.
 fn update_item_text_visibility(
-    camera_query: Query<&OrthographicProjection, With<ControlledCamera>>,
+    camera_query: Query<&Projection, With<ControlledCamera>>,
     mut text_query: Query<&mut Visibility, With<ItemText>>,
 ) {
-    if let Ok(projection) = camera_query.get_single() {
-        let zoom = projection.scale;
-        for mut visibility in text_query.iter_mut() {
-            *visibility = if zoom <= 1.5 {
-                Visibility::Visible
-            } else {
-                Visibility::Hidden
-            };
+    if let Ok(projection) = camera_query.single() {
+        if let Projection::Orthographic(ortho_projection) = projection {
+            let zoom = ortho_projection.scale;
+            for mut visibility in text_query.iter_mut() {
+                *visibility = if zoom <= 1.5 {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                };
+            }
         }
     }
 }

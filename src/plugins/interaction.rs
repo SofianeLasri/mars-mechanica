@@ -28,7 +28,7 @@ pub fn init(mut commands: Commands) {
 pub fn hover_detection(
     mut commands: Commands,
     window_query: Query<&Window, With<PrimaryWindow>>,
-    camera_query: Query<(&Camera, &GlobalTransform, &OrthographicProjection)>,
+    camera_query: Query<(&Camera, &GlobalTransform, &Projection)>,
     mut solid_objects_query: Query<
         (Entity, &Transform, Option<&HoverState>, &SolidObject, &TerrainChunk),
         With<SolidObject>,
@@ -37,7 +37,7 @@ pub fn hover_detection(
     mut text_query: Query<Entity, With<DebugHoverText>>,
     mut writer: TextUiWriter,
 ) {
-    let interaction_sprite = interaction_sprite_query.single_mut();
+    let interaction_sprite = interaction_sprite_query.single_mut().unwrap();
     let cursor_world_position = get_cursor_world_position(window_query, camera_query);
 
     reset_solid_objects_hover_state(&mut commands, &mut solid_objects_query);
@@ -125,18 +125,18 @@ fn update_debug_text(
     writer: &mut TextUiWriter,
     transform: Option<&Transform>,
 ) {
-    // [Cette fonction reste inchangée]
+    let text_entity = text_query.single_mut().unwrap();
     if let Some(transform) = transform {
         let cell_position = Vec2::new(
             transform.translation.x / CELL_SIZE as f32,
             transform.translation.y / CELL_SIZE as f32,
         );
-        *writer.text(text_query.single_mut(), 0) = format!(
+        *writer.text(text_entity, 0) = format!(
             "Hovered cell: ({:.1}, {:.1})",
             cell_position.x, cell_position.y
         );
     } else {
-        *writer.text(text_query.single_mut(), 0) = "Hovered cell: None".to_string();
+        *writer.text(text_entity, 0) = "Hovered cell: None".to_string();
     }
 }
 

@@ -3,6 +3,7 @@ use crate::GameState;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::prelude::*;
+use rand::random;
 use std::collections::HashSet;
 
 pub fn generate_world(

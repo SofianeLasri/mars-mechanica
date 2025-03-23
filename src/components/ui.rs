@@ -17,8 +17,11 @@ pub enum ButtonAction {
     Quit,
 }
 
-// Constantes de style
-pub const BUTTON_COLOR: Color = Color::srgb(0.15, 0.15, 0.15);
-pub const BUTTON_HOVER: Color = Color::srgb(0.25, 0.25, 0.25);
-pub const BUTTON_PRESS: Color = Color::srgb(0.35, 0.75, 0.35);
+#[derive(Component)]
+pub struct MenuComponent;
+
+#[derive(Component)]
+pub struct MenuButtonComponent;
+pub const SIDEBAR_COLOR: Color = Color::srgb(0.075, 0.075, 0.075);
+pub const BUTTON_HOVER_COLOR: Color = Color::srgb(0.15, 0.15, 0.15);
 pub const TEXT_COLOR: Color = Color::WHITE;
