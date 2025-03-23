@@ -1,6 +1,7 @@
 use crate::components::{ChunkUtils, HoverState, SolidObject, TerrainChunk, UpdateTerrainEvent, CELL_SIZE, VEC2_CELL_SIZE};
 use crate::plugins::camera::get_cursor_world_position;
 use crate::plugins::debug_text::DebugHoverText;
+use crate::GameState;
 use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
 use bevy::prelude::*;
@@ -13,8 +14,8 @@ pub struct InteractionSprite;
 
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, init)
-            .add_systems(FixedUpdate, (hover_detection, block_click_handler));
+        app.add_systems(OnEnter(GameState::InGame), init)
+            .add_systems(FixedUpdate, (hover_detection.run_if(in_state(GameState::InGame)), block_click_handler.run_if(in_state(GameState::InGame))));
     }
 }
 

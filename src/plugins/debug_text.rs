@@ -1,3 +1,4 @@
+use crate::GameState;
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -11,8 +12,8 @@ pub struct DebugTextPlugin;
 impl Plugin for DebugTextPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Startup, init)
-            .add_systems(FixedUpdate, update_debug_camera_text);
+            .add_systems(OnEnter(GameState::InGame), init)
+            .add_systems(FixedUpdate, update_debug_camera_text.run_if(in_state(GameState::InGame)));
     }
 }
 pub fn init(

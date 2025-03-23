@@ -1,4 +1,5 @@
 use crate::components::{ChunkMap, ChunkUtils, ControlledCamera, EntityDefinition, ItemText, MaskOverlay, MaterialDefinition, SolidObject, UpdateTerrainEvent, WorldEntities, WorldEntityItem, WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE};
+use crate::GameState;
 use bevy::prelude::*;
 use bevy::text::{JustifyText, TextColor, TextFont, TextLayout};
 use bevy_sprite::Anchor;
@@ -17,12 +18,12 @@ impl Plugin for TerrainPlugin {
             .add_systems(
                 FixedUpdate,
                 (
-                    update_solid_objects,
+                    update_solid_objects.run_if(in_state(GameState::InGame)),
                     update_neighbors_pattern.run_if(on_event::<UpdateTerrainEvent>),
                     update_material_textures
                         .run_if(on_event::<UpdateTerrainEvent>)
                         .after(update_neighbors_pattern),
-                    update_item_text_visibility
+                    update_item_text_visibility.run_if(in_state(GameState::InGame))
                 ),
             );
     }

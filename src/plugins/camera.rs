@@ -1,4 +1,5 @@
 use crate::components::ControlledCamera;
+use crate::GameState;
 use bevy::input::mouse::{MouseButtonInput, MouseWheel};
 use bevy::input::ButtonState;
 use bevy::prelude::*;
@@ -8,8 +9,8 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, init)
-            .add_systems(FixedUpdate, update_camera);
+        app.add_systems(OnEnter(GameState::InGame), init.run_if(in_state(GameState::InGame)))
+            .add_systems(FixedUpdate, update_camera.run_if(in_state(GameState::InGame)));
     }
 }
 

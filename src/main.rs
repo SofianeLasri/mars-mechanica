@@ -2,7 +2,8 @@ mod components;
 mod plugins;
 mod systems;
 
-use crate::plugins::ui;
+use crate::plugins::game::{GamePlugin, WorldGenState};
+use crate::plugins::ui::UiPlugin;
 use bevy::prelude::*;
 
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
@@ -25,11 +26,7 @@ fn main() {
             })
         )
         .init_state::<GameState>()
-        .add_systems(Startup, setup_camera)
-        .add_plugins((ui::UiPlugin))
+        .init_resource::<WorldGenState>()
+        .add_plugins((UiPlugin, GamePlugin))
         .run();
-}
-
-fn setup_camera(mut commands: Commands) {
-    commands.spawn(Camera2d);
 }

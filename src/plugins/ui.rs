@@ -12,12 +12,18 @@ impl Plugin for UiPlugin {
         app.add_systems(OnEnter(GameState::MainMenu), setup_main_menu)
             .add_systems(OnExit(GameState::MainMenu), cleanup_menu)
             .add_systems(OnEnter(GameState::Loading), setup_loading_screen)
-            .add_systems(FixedUpdate, (handle_menu_buttons, handle_loading));
+            .add_systems(FixedUpdate, handle_menu_buttons.run_if(in_state(GameState::MainMenu)))
+            .add_systems(OnExit(GameState::Loading), (cleanup_loading_screen, despawn_ui_camera));
     }
 }
 
+#[derive(Component)]
+struct UiCamera;
+
 fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     info!("Setting up main menu");
+
+    commands.spawn((Camera2d, UiCamera));
 
     let menu_root_node = Node {
         width: Val::Percent(100.0),
@@ -245,15 +251,19 @@ fn setup_loading_screen(mut commands: Commands, asset_server: Res<AssetServer>) 
         });
 }
 
-fn handle_loading(
-    mut next_state: ResMut<NextState<GameState>>,
-    // Ajouter ici les conditions de fin de chargement
-) {
-    // Exemple: Attendre que la génération soit terminée
-    //next_state.set(GameState::InGame);
+pub fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuRoot>>) {
+    for entity in &query {
+        commands.entity(entity).despawn();
+    }
 }
 
-pub fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuRoot>>) {
+fn cleanup_loading_screen(mut commands: Commands, query: Query<Entity, With<LoadingText>>) {
+    for entity in &query {
+        commands.entity(entity).despawn_recursive();
+    }
+}
+
+fn despawn_ui_camera(mut commands: Commands, query: Query<Entity, With<UiCamera>>) {
     for entity in &query {
         commands.entity(entity).despawn();
     }
