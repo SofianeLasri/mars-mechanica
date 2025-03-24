@@ -93,7 +93,11 @@ fn update_splash(
             }
         }
 
-        if splash.current_frame >= 60 {
+        // 30 premières images (1s) = effet glitch
+        // 2 secondes de silence avec la dernière image
+        // .5s de fade out
+        // Changement de state
+        if splash.current_frame >= 29 {
             next_state.set(GameState::MainMenu);
         }
     }

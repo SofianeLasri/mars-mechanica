@@ -53,7 +53,7 @@ fn preload_assets(
     mut loading_state: ResMut<LoadingState>,
 ) {
     let mut handles = Vec::new();
-    for i in 1..=61 {
+    for i in 1..=30 {
         let path = format!("textures/animations/intro/{:04}.png", i);
         let handle = asset_server.load(path);
         handles.push(handle);
