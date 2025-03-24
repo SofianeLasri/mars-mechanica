@@ -5,6 +5,7 @@ use bevy::prelude::*;
 #[derive(Resource)]
 struct SplashAnimation {
     current_frame: usize,
+    phase: SplashPhase,
     timer: Timer,
 }
 
@@ -14,6 +15,15 @@ struct SplashScreen;
 #[derive(Component)]
 struct SplashFrame {
     index: usize,
+}
+
+// En fait comme je n'ai pas trouvé de décodeur vidéo simple d'utilisation,
+// j'ai décidé de faire une animation image par image, puis avec du code :)
+#[derive(Debug, PartialEq, Eq)]
+enum SplashPhase {
+    Glitch,   // 30 premières images (1s)
+    Hold,     // 1s de pause
+    FadeOut,  // 0.25s de fondu
 }
 
 pub struct SplashPlugin;
@@ -63,7 +73,8 @@ fn setup_splash(mut commands: Commands, ui_assets: Res<UiAssets>) {
 
     commands.insert_resource(SplashAnimation {
         current_frame: 0,
-        timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
+        phase: SplashPhase::Glitch,
+        timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating), // 30 FPS
     });
 
     commands.spawn(AudioPlayer::new(ui_assets.sounds[0].clone()));
@@ -73,32 +84,54 @@ fn update_splash(
     time: Res<Time>,
     mut splash: ResMut<SplashAnimation>,
     mut frames: Query<(&mut Visibility, &SplashFrame)>,
+    mut images: Query<(&mut ImageNode, &SplashFrame)>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     splash.timer.tick(time.delta());
 
-    if splash.timer.just_finished() {
-        let previous_frame = splash.current_frame;
-        splash.current_frame += 1;
+    match splash.phase {
+        SplashPhase::Glitch => {
+            if splash.timer.just_finished() {
+                let previous_frame = splash.current_frame;
+                splash.current_frame += 1;
 
-        for (mut visibility, frame) in &mut frames {
-            if frame.index == previous_frame {
-                *visibility = Visibility::Hidden;
+                for (mut visibility, frame) in &mut frames {
+                    if frame.index == previous_frame {
+                        *visibility = Visibility::Hidden;
+                    }
+                }
+
+                for (mut visibility, frame) in &mut frames {
+                    if frame.index == splash.current_frame {
+                        *visibility = Visibility::Visible;
+                    }
+                }
+
+                // Après 30 images (1s), passer à la phase de pause
+                if splash.current_frame >= 29 {
+                    splash.phase = SplashPhase::Hold;
+                    splash.timer = Timer::from_seconds(1.0, TimerMode::Once);
+                }
             }
         }
-
-        for (mut visibility, frame) in &mut frames {
-            if frame.index == splash.current_frame {
-                *visibility = Visibility::Visible;
+        SplashPhase::Hold => {
+            if splash.timer.just_finished() {
+                splash.phase = SplashPhase::FadeOut;
+                splash.timer = Timer::from_seconds(0.25, TimerMode::Once);
             }
         }
+        SplashPhase::FadeOut => {
+            let alpha = 1.0 - (splash.timer.elapsed_secs() / 0.5).min(1.0);
 
-        // 30 premières images (1s) = effet glitch
-        // 2 secondes de silence avec la dernière image
-        // .5s de fade out
-        // Changement de state
-        if splash.current_frame >= 29 {
-            next_state.set(GameState::MainMenu);
+            for (mut image, frame) in &mut images {
+                if frame.index == 29 {
+                    image.color.set_alpha(alpha);
+                }
+            }
+
+            if splash.timer.just_finished() {
+                next_state.set(GameState::MainMenu);
+            }
         }
     }
 }

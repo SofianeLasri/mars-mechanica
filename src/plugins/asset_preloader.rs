@@ -6,7 +6,6 @@ use crate::GameState;
 use bevy::app::Update;
 use bevy::asset::{AssetServer, Handle, LoadState};
 use bevy::audio::AudioSource;
-use bevy::color::Color;
 use bevy::image::Image;
 use bevy::log::error;
 use bevy::prelude::{
