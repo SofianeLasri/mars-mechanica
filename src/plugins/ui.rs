@@ -1,7 +1,7 @@
 use crate::components::{
-    ButtonAction, LoadingText, MenuButton, MenuRoot, BUTTON_HOVER_COLOR,
-    SIDEBAR_COLOR, TEXT_COLOR,
+    ButtonAction, LoadingText, MenuButton, MenuRoot, BUTTON_HOVER_COLOR, SIDEBAR_COLOR, TEXT_COLOR,
 };
+use crate::plugins::splash::UiAssets;
 use crate::GameState;
 use bevy::prelude::*;
 
@@ -12,15 +12,24 @@ impl Plugin for UiPlugin {
         app.add_systems(OnEnter(GameState::MainMenu), setup_main_menu)
             .add_systems(OnExit(GameState::MainMenu), cleanup_menu)
             .add_systems(OnEnter(GameState::Loading), setup_loading_screen)
-            .add_systems(FixedUpdate, handle_menu_buttons.run_if(in_state(GameState::MainMenu)))
-            .add_systems(OnExit(GameState::Loading), (cleanup_loading_screen, despawn_ui_camera));
+            .add_systems(
+                FixedUpdate,
+                handle_menu_buttons.run_if(in_state(GameState::MainMenu)),
+            )
+            .add_systems(
+                OnExit(GameState::Loading),
+                (cleanup_loading_screen, despawn_ui_camera),
+            );
     }
 }
 
 #[derive(Component)]
 pub(crate) struct UiCamera;
 
-fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
+#[derive(Component)]
+struct UiSound;
+
+fn setup_main_menu(mut commands: Commands, ui_assets: Res<UiAssets>) {
     info!("Setting up main menu");
 
     let menu_root_node = Node {
@@ -30,7 +39,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         ..default()
     };
 
-    let background_image_node = ImageNode::from(asset_server.load("textures/background.png"));
+    let background_image_node = ImageNode::from(ui_assets.images.last().unwrap().clone());
 
     let side_bar = (
         Node {
@@ -47,7 +56,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     let game_title = (
         Text::new("Mars Mechanica"),
         TextFont {
-            font: asset_server.load("fonts/inter-bold.ttf"),
+            font: ui_assets.fonts.last().unwrap().clone(),
             font_size: 36.0,
             line_height: Default::default(),
             font_smoothing: Default::default(),
@@ -58,7 +67,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     let game_author = (
         Text::new("Par Sofiane Lasri"),
         TextFont {
-            font: asset_server.load("fonts/inter-regular.ttf"),
+            font: ui_assets.fonts.first().unwrap().clone(),
             font_size: 16.0,
             line_height: Default::default(),
             font_smoothing: Default::default(),
@@ -75,12 +84,15 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         ..default()
     };
 
-    let button_node = (Node {
-        flex_direction: FlexDirection::Row,
-        align_items: AlignItems::Center,
-        padding: UiRect::new(Val::Px(16.0), Val::Px(16.0), Val::Px(8.0), Val::Px(8.0)),
-        ..default()
-    }, Button);
+    let button_node = (
+        Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            padding: UiRect::new(Val::Px(16.0), Val::Px(16.0), Val::Px(8.0), Val::Px(8.0)),
+            ..default()
+        },
+        Button,
+    );
 
     let buttons_sub_container = Node {
         flex_direction: FlexDirection::Column,
@@ -123,7 +135,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                                             },
                                             children![compute_button(
                                                 "Créer un monde",
-                                                &asset_server
+                                                &ui_assets.fonts.first().unwrap().clone()
                                             )]
                                         ),
                                         (
@@ -134,7 +146,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                                             },
                                             children![compute_button(
                                                 "Charger une seed",
-                                                &asset_server
+                                                &ui_assets.fonts.first().unwrap().clone()
                                             )]
                                         )
                                     ]
@@ -148,7 +160,10 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                                             MenuButton {
                                                 action: ButtonAction::Settings
                                             },
-                                            children![compute_button("Paramètres", &asset_server)]
+                                            children![compute_button(
+                                                "Paramètres",
+                                                &ui_assets.fonts.first().unwrap().clone()
+                                            )]
                                         ),
                                         (
                                             button_node.clone(),
@@ -156,7 +171,10 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                                             MenuButton {
                                                 action: ButtonAction::Credits
                                             },
-                                            children![compute_button("Crédits", &asset_server)]
+                                            children![compute_button(
+                                                "Crédits",
+                                                &ui_assets.fonts.first().unwrap().clone()
+                                            )]
                                         )
                                     ]
                                 )
@@ -168,7 +186,10 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                             MenuButton {
                                 action: ButtonAction::Quit
                             },
-                            children![compute_button("Quitter", &asset_server)]
+                            children![compute_button(
+                                "Quitter",
+                                &ui_assets.fonts.first().unwrap().clone()
+                            )]
                         )
                     ]
                 ),
@@ -177,11 +198,11 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
     ));
 }
 
-fn compute_button(text: &str, asset_server: &Res<AssetServer>) -> (Text, TextFont, TextColor) {
+fn compute_button(text: &str, font: &Handle<Font>) -> (Text, TextFont, TextColor) {
     (
         Text::new(text),
         TextFont {
-            font: asset_server.load("fonts/inter-regular.ttf"),
+            font: font.clone(),
             font_size: 24.0,
             line_height: Default::default(),
             font_smoothing: Default::default(),
@@ -191,17 +212,20 @@ fn compute_button(text: &str, asset_server: &Res<AssetServer>) -> (Text, TextFon
 }
 
 fn handle_menu_buttons(
+    mut commands: Commands,
     mut interaction_query: Query<
         (&Interaction, &MenuButton, &mut BackgroundColor),
         Changed<Interaction>,
     >,
     mut app_exit: EventWriter<AppExit>,
     mut next_state: ResMut<NextState<GameState>>,
+    ui_assets: Res<UiAssets>
 ) {
     for (interaction, button, mut color) in &mut interaction_query {
         match interaction {
             Interaction::Pressed => {
                 *color = BUTTON_HOVER_COLOR.into();
+                commands.spawn((AudioPlayer::new(ui_assets.sounds[2].clone()), UiSound));
 
                 if let ButtonAction::GenerateWorld = button.action {
                     next_state.set(GameState::Loading)
@@ -209,7 +233,10 @@ fn handle_menu_buttons(
                     app_exit.send(AppExit::Success);
                 }
             }
-            Interaction::Hovered => *color = BUTTON_HOVER_COLOR.into(),
+            Interaction::Hovered => {
+                *color = BUTTON_HOVER_COLOR.into();
+                commands.spawn((AudioPlayer::new(ui_assets.sounds[1].clone()), UiSound));
+            }
             Interaction::None => *color = Color::NONE.into(),
         }
     }

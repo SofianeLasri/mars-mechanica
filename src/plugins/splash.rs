@@ -4,9 +4,10 @@ use bevy::asset::LoadState;
 use bevy::prelude::*;
 
 #[derive(Resource, Default)]
-struct SplashAssets {
-    image_handles: Vec<Handle<Image>>,
-    intro_audio: Handle<AudioSource>,
+pub struct UiAssets {
+    pub(crate) images: Vec<Handle<Image>>,
+    pub(crate) sounds: Vec<Handle<AudioSource>>,
+    pub(crate) fonts: Vec<Handle<Font>>,
 }
 
 #[derive(Resource)]
@@ -27,8 +28,8 @@ pub struct SplashPlugin;
 
 impl Plugin for SplashPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<SplashAssets>()
-            .add_systems(OnEnter(GameState::AssetLoading), load_splash_assets)
+        app.init_resource::<UiAssets>()
+            .add_systems(OnEnter(GameState::AssetLoading), preload_assets)
             .add_systems(
                 Update,
                 check_assets_loaded.run_if(in_state(GameState::AssetLoading)),
@@ -42,38 +43,52 @@ impl Plugin for SplashPlugin {
     }
 }
 
-fn load_splash_assets(asset_server: Res<AssetServer>, mut splash_assets: ResMut<SplashAssets>) {
+fn preload_assets(asset_server: Res<AssetServer>, mut ui_assets: ResMut<UiAssets>) {
     let mut handles = Vec::new();
     for i in 1..=61 {
         let path = format!("textures/animations/intro/{:04}.png", i);
         let handle = asset_server.load(path);
         handles.push(handle);
     }
-    splash_assets.image_handles = handles;
-    splash_assets.intro_audio = asset_server.load("sounds/intro.ogg")
+    handles.push(asset_server.load("textures/ui/background.png"));
+    ui_assets.images = handles;
+
+    let mut audio_handles = Vec::new();
+    audio_handles.push(asset_server.load("sounds/intro.ogg"));
+    audio_handles.push(asset_server.load("sounds/menu-hover.wav"));
+    audio_handles.push(asset_server.load("sounds/menu-select.wav"));
+    ui_assets.sounds = audio_handles;
+
+    let mut font_handles = Vec::new();
+    font_handles.push(asset_server.load("fonts/inter-regular.ttf"));
+    font_handles.push(asset_server.load("fonts/inter-bold.ttf"));
+    ui_assets.fonts = font_handles;
 }
 
 fn check_assets_loaded(
     asset_server: Res<AssetServer>,
-    splash_assets: Res<SplashAssets>,
+    splash_assets: Res<UiAssets>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    let images_loaded = splash_assets.image_handles.iter().all(|handle| {
+    let images_loaded = splash_assets.images.iter().all(|handle| {
         matches!(asset_server.get_load_state(handle).unwrap(), LoadState::Loaded)
     });
 
-    let audio_loaded = matches!(
-        asset_server.get_load_state(&splash_assets.intro_audio).unwrap(),
-        LoadState::Loaded
-    );
+    let audio_loaded = splash_assets.sounds.iter().all(|handle| {
+        matches!(asset_server.get_load_state(handle).unwrap(), LoadState::Loaded)
+    });
 
-    if images_loaded && audio_loaded {
+    let fonts_loaded = splash_assets.fonts.iter().all(|handle| {
+        matches!(asset_server.get_load_state(handle).unwrap(), LoadState::Loaded)
+    });
+
+    if images_loaded && audio_loaded && fonts_loaded {
         info!("All splash assets loaded");
         next_state.set(GameState::SplashScreen);
     }
 }
 
-fn setup_splash(mut commands: Commands, splash_assets: Res<SplashAssets>) {
+fn setup_splash(mut commands: Commands, ui_assets: Res<UiAssets>) {
     let mut splash_parent = commands.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -83,7 +98,7 @@ fn setup_splash(mut commands: Commands, splash_assets: Res<SplashAssets>) {
         SplashScreen,
     ));
 
-    for (i, handle) in splash_assets.image_handles.iter().enumerate() {
+    for (i, handle) in ui_assets.images.iter().enumerate() {
         splash_parent.with_children(|parent| {
             parent.spawn((
                 ImageNode::from(handle.clone()),
@@ -111,7 +126,7 @@ fn setup_splash(mut commands: Commands, splash_assets: Res<SplashAssets>) {
     });
 
     commands.spawn((Camera2d::default(), UiCamera));
-    commands.spawn(AudioPlayer::new(splash_assets.intro_audio.clone()));
+    commands.spawn(AudioPlayer::new(ui_assets.sounds[0].clone()));
 }
 
 fn update_splash(
@@ -125,19 +140,16 @@ fn update_splash(
     if splash.timer.just_finished() {
         let previous_frame = splash.current_frame;
         splash.current_frame += 1;
-        info!("Current frame: {}", splash.current_frame);
 
         for (mut visibility, frame) in &mut frames {
             if frame.index == previous_frame {
                 *visibility = Visibility::Hidden;
-                info!("Hiding frame {}", previous_frame);
             }
         }
 
         for (mut visibility, frame) in &mut frames {
             if frame.index == splash.current_frame {
                 *visibility = Visibility::Visible;
-                info!("Showing frame {}", splash.current_frame);
             }
         }
 
