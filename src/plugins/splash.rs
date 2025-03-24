@@ -1,3 +1,4 @@
+use crate::components::TEXT_COLOR;
 use crate::plugins::asset_preloader::UiAssets;
 use crate::GameState;
 use bevy::prelude::*;
@@ -17,13 +18,20 @@ struct SplashFrame {
     index: usize,
 }
 
+#[derive(Component)]
+struct InfoText;
+
+#[derive(Component)]
+struct InfoScreen;
+
 // En fait comme je n'ai pas trouvé de décodeur vidéo simple d'utilisation,
 // j'ai décidé de faire une animation image par image, puis avec du code :)
 #[derive(Debug, PartialEq, Eq)]
 enum SplashPhase {
-    Glitch,   // 30 premières images (1s)
-    Hold,     // 1s de pause
-    FadeOut,  // 0.25s de fondu
+    Glitch,     // 30 premières images (1s)
+    Hold,       // 1s de pause
+    FadeOut,    // 0.25s de fondu
+    InfoScreen, // 5s d'affichage
 }
 
 pub struct SplashPlugin;
@@ -71,10 +79,37 @@ fn setup_splash(mut commands: Commands, ui_assets: Res<UiAssets>) {
         });
     }
 
+    splash_parent.with_children(|parent| {
+        parent.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Start,
+                padding: UiRect::all(Val::Px(96.0)),
+                ..default()
+            },
+            Visibility::Hidden,
+            InfoScreen,
+            children![(
+                Text::new("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."),
+                TextFont {
+                    font: ui_assets.fonts.first().unwrap().clone(),
+                    font_size: 24.0,
+                    line_height: Default::default(),
+                    font_smoothing: Default::default(),
+                },
+                TextColor(TEXT_COLOR),
+                InfoText,
+            )],
+        ));
+    });
+
     commands.insert_resource(SplashAnimation {
         current_frame: 0,
         phase: SplashPhase::Glitch,
-        timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating), // 30 FPS
+        timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
     });
 
     commands.spawn(AudioPlayer::new(ui_assets.sounds[0].clone()));
@@ -85,6 +120,7 @@ fn update_splash(
     mut splash: ResMut<SplashAnimation>,
     mut frames: Query<(&mut Visibility, &SplashFrame)>,
     mut images: Query<(&mut ImageNode, &SplashFrame)>,
+    mut info_screen: Query<&mut Visibility, (With<InfoScreen>, Without<SplashFrame>)>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     splash.timer.tick(time.delta());
@@ -92,22 +128,16 @@ fn update_splash(
     match splash.phase {
         SplashPhase::Glitch => {
             if splash.timer.just_finished() {
-                let previous_frame = splash.current_frame;
                 splash.current_frame += 1;
 
                 for (mut visibility, frame) in &mut frames {
-                    if frame.index == previous_frame {
-                        *visibility = Visibility::Hidden;
-                    }
+                    *visibility = if frame.index == splash.current_frame {
+                        Visibility::Visible
+                    } else {
+                        Visibility::Hidden
+                    };
                 }
 
-                for (mut visibility, frame) in &mut frames {
-                    if frame.index == splash.current_frame {
-                        *visibility = Visibility::Visible;
-                    }
-                }
-
-                // Après 30 images (1s), passer à la phase de pause
                 if splash.current_frame >= 29 {
                     splash.phase = SplashPhase::Hold;
                     splash.timer = Timer::from_seconds(1.0, TimerMode::Once);
@@ -121,14 +151,23 @@ fn update_splash(
             }
         }
         SplashPhase::FadeOut => {
-            let alpha = 1.0 - (splash.timer.elapsed_secs() / 0.5).min(1.0);
-
+            let alpha = 1.0 - (splash.timer.elapsed_secs() / 0.25).min(1.0);
             for (mut image, frame) in &mut images {
                 if frame.index == 29 {
                     image.color.set_alpha(alpha);
                 }
             }
 
+            if splash.timer.just_finished() {
+                splash.phase = SplashPhase::InfoScreen;
+                splash.timer = Timer::from_seconds(4.0, TimerMode::Once);
+
+                if let Ok(mut overlay) = info_screen.single_mut() {
+                    *overlay = Visibility::Visible;
+                }
+            }
+        }
+        SplashPhase::InfoScreen => {
             if splash.timer.just_finished() {
                 next_state.set(GameState::MainMenu);
             }
@@ -139,6 +178,6 @@ fn update_splash(
 fn cleanup_splash(mut commands: Commands, query: Query<Entity, With<SplashScreen>>) {
     commands.remove_resource::<SplashAnimation>();
     for entity in &query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
