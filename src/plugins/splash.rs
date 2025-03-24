@@ -46,6 +46,7 @@ impl Plugin for SplashPlugin {
                 Update,
                 (check_assets_loaded, update_loading_bar).run_if(in_state(GameState::AssetLoading)),
             )
+            .add_systems(OnExit(GameState::AssetLoading), cleanup_loading_bar)
             .add_systems(OnEnter(GameState::SplashScreen), setup_splash)
             .add_systems(
                 FixedUpdate,
