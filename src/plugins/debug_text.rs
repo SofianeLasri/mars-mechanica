@@ -1,3 +1,4 @@
+use crate::GameState;
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -11,8 +12,8 @@ pub struct DebugTextPlugin;
 impl Plugin for DebugTextPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Startup, init)
-            .add_systems(FixedUpdate, update_debug_camera_text);
+            .add_systems(OnEnter(GameState::InGame), init)
+            .add_systems(FixedUpdate, update_debug_camera_text.run_if(in_state(GameState::InGame)));
     }
 }
 pub fn init(
@@ -57,7 +58,7 @@ pub fn update_debug_camera_text(
     window_query: Query<&Window>,
     mut writer: TextUiWriter,
 ) {
-    let window = window_query.single();
+    let window = window_query.single().unwrap();
 
     let cursor_position = if let Some(position) = window.cursor_position() {
         let window_size = Vec2::new(window.width(), window.height());
@@ -66,6 +67,7 @@ pub fn update_debug_camera_text(
     } else {
         Vec2::new(0.0, 0.0)
     };
-    
-    *writer.text(text_query.single_mut(), 0) = format!("Mouse position: ({:.1}, {:.1})", cursor_position.x, cursor_position.y);
+
+    let text_entity = text_query.single().unwrap();
+    *writer.text(text_entity, 0) = format!("Mouse position: ({:.1}, {:.1})", cursor_position.x, cursor_position.y);
 }

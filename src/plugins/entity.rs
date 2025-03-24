@@ -1,3 +1,4 @@
+use crate::GameState;
 use bevy::color::palettes::basic::PURPLE;
 use bevy::prelude::*;
 
@@ -5,7 +6,7 @@ pub struct EntityPlugin;
 
 impl Plugin for EntityPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_multiple_squares);
+        app.add_systems(OnEnter(GameState::InGame), spawn_multiple_squares.run_if(in_state(GameState::InGame)));
     }
 }
 

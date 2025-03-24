@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = "0.15.3"
-bevy_sprite = "0.15.3"
+bevy = "0.16.0-rc.1"
+bevy_sprite = "0.16.0-rc.1"
 noise = "0.9.0"
-rand = "0.8.5"
+rand = "0.9.0"
 
 [profile.release]
 # Compile the entire crate as one unit.

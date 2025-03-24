@@ -2,11 +2,20 @@ mod components;
 mod plugins;
 mod systems;
 
-use crate::plugins::{
-    CameraPlugin, DebugTextPlugin, EntityPlugin, InteractionPlugin, TerrainPlugin,
-};
-use crate::systems::generate_world;
+use crate::plugins::game::GamePlugin;
+use crate::plugins::splash::SplashPlugin;
+use crate::plugins::ui::UiPlugin;
 use bevy::prelude::*;
+
+#[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
+enum GameState {
+    #[default]
+    AssetLoading,
+    SplashScreen,
+    MainMenu,
+    Loading,
+    InGame,
+}
 
 fn main() {
     App::new()
@@ -19,13 +28,8 @@ fn main() {
                 ..Default::default()
             })
         )
-        .add_plugins((
-            EntityPlugin,
-            CameraPlugin,
-            TerrainPlugin,
-            DebugTextPlugin,
-            InteractionPlugin,
-        ))
-        .add_systems(Startup, generate_world)
+        .insert_resource(ClearColor(Color::BLACK))
+        .init_state::<GameState>()
+        .add_plugins((SplashPlugin, UiPlugin, GamePlugin))
         .run();
 }

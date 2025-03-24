@@ -1,4 +1,5 @@
 use crate::components::{ChunkMap, ChunkUtils, ControlledCamera, EntityDefinition, ItemText, MaskOverlay, MaterialDefinition, SolidObject, UpdateTerrainEvent, WorldEntities, WorldEntityItem, WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE};
+use crate::GameState;
 use bevy::prelude::*;
 use bevy::text::{JustifyText, TextColor, TextFont, TextLayout};
 use bevy_sprite::Anchor;
@@ -17,12 +18,12 @@ impl Plugin for TerrainPlugin {
             .add_systems(
                 FixedUpdate,
                 (
-                    update_solid_objects,
+                    update_solid_objects.run_if(in_state(GameState::InGame)),
                     update_neighbors_pattern.run_if(on_event::<UpdateTerrainEvent>),
                     update_material_textures
                         .run_if(on_event::<UpdateTerrainEvent>)
                         .after(update_neighbors_pattern),
-                    update_item_text_visibility
+                    update_item_text_visibility.run_if(in_state(GameState::InGame))
                 ),
             );
     }
@@ -475,7 +476,7 @@ fn remove_mask_overlays_from_parent(
     mask_overlay_query: &Query<(), With<MaskOverlay>>,
 ) {
     if let Ok(children) = children_query.get(parent) {
-        for &child in children.iter() {
+        for child in children.iter() {
             if mask_overlay_query.get(child).is_ok() {
                 commands.entity(child).despawn_recursive();
             }
@@ -720,17 +721,19 @@ fn spawn_border_masks(
 ///
 /// If the camera zoom level is less than 1.0, the text is hidden.
 fn update_item_text_visibility(
-    camera_query: Query<&OrthographicProjection, With<ControlledCamera>>,
+    camera_query: Query<&Projection, With<ControlledCamera>>,
     mut text_query: Query<&mut Visibility, With<ItemText>>,
 ) {
-    if let Ok(projection) = camera_query.get_single() {
-        let zoom = projection.scale;
-        for mut visibility in text_query.iter_mut() {
-            *visibility = if zoom <= 1.5 {
-                Visibility::Visible
-            } else {
-                Visibility::Hidden
-            };
+    if let Ok(projection) = camera_query.single() {
+        if let Projection::Orthographic(ortho_projection) = projection {
+            let zoom = ortho_projection.scale;
+            for mut visibility in text_query.iter_mut() {
+                *visibility = if zoom <= 1.5 {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                };
+            }
         }
     }
 }
