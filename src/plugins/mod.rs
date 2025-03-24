@@ -6,3 +6,4 @@ pub mod camera;
 pub mod ui;
 pub mod game;
 pub mod splash;
+pub mod asset_preloader;

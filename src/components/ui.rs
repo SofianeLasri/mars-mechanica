@@ -34,3 +34,7 @@ pub struct MenuButtonComponent;
 pub const SIDEBAR_COLOR: Color = Color::srgb(0.075, 0.075, 0.075);
 pub const BUTTON_HOVER_COLOR: Color = Color::srgb(0.15, 0.15, 0.15);
 pub const TEXT_COLOR: Color = Color::WHITE;
+
+pub const LOADING_BAR_COLOR: Color = Color::srgb(27.0 / 255.0, 27.0 / 255.0, 27.0 / 255.0);
+pub const LOADING_BAR_ERROR_COLOR: Color = Color::srgb(0.5, 0.0, 0.0);
+pub const LOADING_PROGRESS_COLOR: Color = Color::srgb(215.0 / 255.0, 215.0 / 255.0, 215.0 / 255.0);

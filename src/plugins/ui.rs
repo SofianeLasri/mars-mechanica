@@ -1,7 +1,8 @@
 use crate::components::{
     ButtonAction, LoadingText, MenuButton, MenuRoot, BUTTON_HOVER_COLOR, SIDEBAR_COLOR, TEXT_COLOR,
 };
-use crate::plugins::splash::UiAssets;
+
+use crate::plugins::asset_preloader::UiAssets;
 use crate::GameState;
 use bevy::prelude::*;
 
