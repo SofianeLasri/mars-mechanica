@@ -1,4 +1,10 @@
-use crate::components::{ChunkMap, ChunkUtils, ControlledCamera, EntityDefinition, ItemText, MaskOverlay, MaterialDefinition, SolidObject, UpdateTerrainEvent, WorldEntities, WorldEntityItem, WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE};
+use crate::components::{
+    ChunkMap, ChunkUtils, ControlledCamera, EntitiesToDespawn, EntityDefinition, ItemText,
+    MaskOverlay, MaterialDefinition, SolidObject, UpdateTerrainEvent, WorldEntities, WorldEntityItem,
+    WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM,
+    NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP,
+    NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE,
+};
 use crate::GameState;
 use bevy::prelude::*;
 use bevy::text::{JustifyText, TextColor, TextFont, TextLayout};
@@ -13,6 +19,7 @@ impl Plugin for TerrainPlugin {
         app.init_resource::<WorldMaterials>()
             .init_resource::<WorldEntities>()
             .init_resource::<ChunkMap>()
+            .init_resource::<EntitiesToDespawn>()
             .add_event::<UpdateTerrainEvent>()
             .add_systems(PreStartup, init_world_definitions)
             .add_systems(
@@ -23,7 +30,8 @@ impl Plugin for TerrainPlugin {
                     update_material_textures
                         .run_if(on_event::<UpdateTerrainEvent>)
                         .after(update_neighbors_pattern),
-                    update_item_text_visibility.run_if(in_state(GameState::InGame))
+                    apply_despawns.after(update_material_textures),
+                    update_item_text_visibility.run_if(in_state(GameState::InGame)),
                 ),
             );
     }
@@ -192,7 +200,8 @@ fn update_solid_objects(
     world_materials: Res<WorldMaterials>,
     world_entities: Res<WorldEntities>,
     mut chunk_map: ResMut<ChunkMap>,
-    asset_server: Res<AssetServer>
+    asset_server: Res<AssetServer>,
+    mut to_despawn: ResMut<EntitiesToDespawn>,
 ) {
     for (entity, solid_object, transform) in solid_objects.iter() {
         if solid_object.health <= 0.0 {
@@ -206,19 +215,21 @@ fn update_solid_objects(
                         rng.gen_range(material.drop_count_min..=material.drop_count_max)
                     };
 
-                    let item_entity = commands.spawn((
-                        Sprite {
-                            image: entity_def.icon.clone(),
-                            custom_size: Some(Vec2::splat(64.0)),
-                            ..Default::default()
-                        },
-                        Transform::from_translation(transform.translation),
-                        Visibility::Visible,
-                        WorldEntityItem {
-                            entity_id: material.drop_entity_id.clone(),
-                            quantity: drop_count,
-                        },
-                    )).id();
+                    let item_entity = commands
+                        .spawn((
+                            Sprite {
+                                image: entity_def.icon.clone(),
+                                custom_size: Some(Vec2::splat(64.0)),
+                                ..Default::default()
+                            },
+                            Transform::from_translation(transform.translation),
+                            Visibility::Visible,
+                            WorldEntityItem {
+                                entity_id: material.drop_entity_id.clone(),
+                                quantity: drop_count,
+                            },
+                        ))
+                        .id();
 
                     let text_position = Vec3::new(
                         transform.translation.x,
@@ -249,11 +260,18 @@ fn update_solid_objects(
             let y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
             let (chunk_x, chunk_y) = ChunkUtils::world_to_chunk_coords(x, y);
 
+            info!("Destroying entity {:?} at ({}, {})", entity, x, y);
             if let Some(entities) = chunk_map.chunks.get_mut(&(chunk_x, chunk_y)) {
                 entities.remove(&entity);
+                info!(
+                    "Entity {:?} removed from chunk {:?}",
+                    entity,
+                    (chunk_x, chunk_y)
+                );
             }
 
-            commands.entity(entity).despawn();
+            info!("Planing despawn for entity {:?}", entity);
+            to_despawn.0.push(entity); // <-- Ajout à la liste
         }
     }
 }
@@ -735,5 +753,13 @@ fn update_item_text_visibility(
                 };
             }
         }
+    }
+}
+
+/// This system despawns the entities in the EntitiesToDespawn resource
+fn apply_despawns(mut commands: Commands, mut to_despawn: ResMut<EntitiesToDespawn>) {
+    for entity in to_despawn.0.drain(..) {
+        commands.entity(entity).despawn();
+        info!("Entity {:?} despawned", entity);
     }
 }

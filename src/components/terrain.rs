@@ -92,6 +92,9 @@ pub struct EntityDefinition {
     pub max_stack: i32,
 }
 
+#[derive(Resource, Default)]
+pub struct EntitiesToDespawn(pub(crate) Vec<Entity>);
+
 // --- CONSTANTES ---
 
 /// Number of blocks in each chunk.
