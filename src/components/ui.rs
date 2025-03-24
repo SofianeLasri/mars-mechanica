@@ -7,6 +7,12 @@ pub struct MenuRoot;
 pub struct LoadingText;
 
 #[derive(Component)]
+pub struct LoadingBar;
+
+#[derive(Component)]
+pub struct LoadingProgress;
+
+#[derive(Component)]
 pub struct MenuButton {
     pub(crate) action: ButtonAction,
 }
