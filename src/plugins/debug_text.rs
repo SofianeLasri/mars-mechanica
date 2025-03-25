@@ -1,5 +1,9 @@
 use crate::GameState;
-use bevy::prelude::*;
+use bevy::prelude::{
+    App, AssetServer, Commands, Component, Entity, FixedUpdate, IntoScheduleConfigs, Node, OnEnter,
+    Plugin, PositionType, Query, Res, Text, TextFont, TextUiWriter, Val, Vec2, Window, With,
+    default, in_state,
+};
 
 #[derive(Component)]
 pub struct DebugCameraText;
@@ -11,15 +15,14 @@ pub struct DebugTextPlugin;
 
 impl Plugin for DebugTextPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(OnEnter(GameState::InGame), init)
-            .add_systems(FixedUpdate, update_debug_camera_text.run_if(in_state(GameState::InGame)));
+        app.add_systems(OnEnter(GameState::InGame), init)
+            .add_systems(
+                FixedUpdate,
+                update_debug_camera_text.run_if(in_state(GameState::InGame)),
+            );
     }
 }
-pub fn init(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
+pub fn init(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         Text::new("Mouse position: (0.0, 0.0)"),
         TextFont {
@@ -35,7 +38,7 @@ pub fn init(
         },
         DebugCameraText,
     ));
-    
+
     commands.spawn((
         Text::new("Hovered cell: None"),
         TextFont {
@@ -69,5 +72,8 @@ pub fn update_debug_camera_text(
     };
 
     let text_entity = text_query.single().unwrap();
-    *writer.text(text_entity, 0) = format!("Mouse position: ({:.1}, {:.1})", cursor_position.x, cursor_position.y);
+    *writer.text(text_entity, 0) = format!(
+        "Mouse position: ({:.1}, {:.1})",
+        cursor_position.x, cursor_position.y
+    );
 }

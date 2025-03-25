@@ -2,7 +2,11 @@ use crate::GameState;
 use crate::components::ControlledCamera;
 use bevy::input::ButtonState;
 use bevy::input::mouse::{MouseButtonInput, MouseWheel};
-use bevy::prelude::*;
+use bevy::prelude::{
+    App, Camera, Camera2d, Commands, EventReader, FixedUpdate, GlobalTransform,
+    IntoScheduleConfigs, MouseButton, Mut, OnEnter, Plugin, Projection, Query, Transform, Vec2,
+    Window, With, in_state, warn,
+};
 use bevy::window::PrimaryWindow;
 
 pub struct CameraPlugin;

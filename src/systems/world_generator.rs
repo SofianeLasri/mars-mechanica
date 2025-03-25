@@ -1,9 +1,10 @@
 use crate::components::terrain::*;
 use crate::GameState;
-use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::random;
 use std::collections::HashSet;
+use bevy::prelude::{info, Commands, EventWriter, NextState, Res, ResMut, Transform};
+use bevy_sprite::Sprite;
 
 pub fn generate_world(
     mut commands: Commands,

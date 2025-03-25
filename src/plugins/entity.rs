@@ -1,6 +1,9 @@
+use bevy::color::Color;
 use crate::GameState;
 use bevy::color::palettes::basic::PURPLE;
-use bevy::prelude::*;
+use bevy::math::Vec3;
+use bevy::prelude::{in_state, App, AssetServer, Assets, Commands, IntoScheduleConfigs, Mesh, Mesh2d, OnEnter, Plugin, Rectangle, Res, ResMut, Transform, Vec2};
+use bevy_sprite::{ColorMaterial, MeshMaterial2d};
 
 pub struct EntityPlugin;
 
