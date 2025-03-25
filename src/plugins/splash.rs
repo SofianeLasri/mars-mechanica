@@ -1,6 +1,6 @@
+use crate::GameState;
 use crate::components::TEXT_COLOR;
 use crate::plugins::asset_preloader::UiAssets;
-use crate::GameState;
 use bevy::prelude::*;
 
 #[derive(Resource)]
@@ -112,7 +112,10 @@ fn setup_splash(mut commands: Commands, ui_assets: Res<UiAssets>) {
         timer: Timer::from_seconds(1.0 / 30.0, TimerMode::Repeating),
     });
 
-    commands.spawn(AudioPlayer::new(ui_assets.sounds[0].clone()));
+    commands.spawn((
+        AudioPlayer(ui_assets.sounds[0].clone()),
+        PlaybackSettings::DESPAWN,
+    ));
 }
 
 fn update_splash(

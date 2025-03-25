@@ -1,9 +1,9 @@
 use crate::components::{
-    ButtonAction, LoadingText, MenuButton, MenuRoot, BUTTON_HOVER_COLOR, SIDEBAR_COLOR, TEXT_COLOR,
+    BUTTON_HOVER_COLOR, ButtonAction, LoadingText, MenuButton, MenuRoot, SIDEBAR_COLOR, TEXT_COLOR,
 };
 
-use crate::plugins::asset_preloader::UiAssets;
 use crate::GameState;
+use crate::plugins::asset_preloader::UiAssets;
 use bevy::prelude::*;
 
 pub struct UiPlugin;
@@ -220,13 +220,17 @@ fn handle_menu_buttons(
     >,
     mut app_exit: EventWriter<AppExit>,
     mut next_state: ResMut<NextState<GameState>>,
-    ui_assets: Res<UiAssets>
+    ui_assets: Res<UiAssets>,
 ) {
     for (interaction, button, mut color) in &mut interaction_query {
         match interaction {
             Interaction::Pressed => {
                 *color = BUTTON_HOVER_COLOR.into();
-                commands.spawn((AudioPlayer::new(ui_assets.sounds[2].clone()), UiSound));
+                commands.spawn((
+                    AudioPlayer::new(ui_assets.sounds[2].clone()),
+                    PlaybackSettings::DESPAWN,
+                    UiSound,
+                ));
 
                 if let ButtonAction::GenerateWorld = button.action {
                     next_state.set(GameState::Loading)
@@ -236,7 +240,11 @@ fn handle_menu_buttons(
             }
             Interaction::Hovered => {
                 *color = BUTTON_HOVER_COLOR.into();
-                commands.spawn((AudioPlayer::new(ui_assets.sounds[1].clone()), UiSound));
+                commands.spawn((
+                    AudioPlayer::new(ui_assets.sounds[1].clone()),
+                    PlaybackSettings::DESPAWN,
+                    UiSound,
+                ));
             }
             Interaction::None => *color = Color::NONE.into(),
         }
