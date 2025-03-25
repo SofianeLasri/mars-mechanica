@@ -159,7 +159,7 @@ fn init_world_definitions(
 }
 
 /// This method loads the material sprites from the asset server
-fn load_material_sprites(
+pub fn load_material_sprites(
     asset_server: &Res<AssetServer>,
     material_id: &str,
 ) -> HashMap<String, Handle<Image>> {

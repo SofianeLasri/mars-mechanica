@@ -1,6 +1,6 @@
 use crate::components::{
     LOADING_BAR_COLOR, LOADING_BAR_ERROR_COLOR, LOADING_PROGRESS_COLOR, LoadingBar,
-    LoadingProgress, UiCamera,
+    LoadingProgress, UiCamera, WorldEntities, WorldMaterials,
 };
 use crate::{CliArgs, GameState};
 use bevy::app::Update;
@@ -8,7 +8,7 @@ use bevy::asset::{AssetServer, Handle, LoadState};
 use bevy::audio::AudioSource;
 use bevy::image::Image;
 use bevy::prelude::{
-    BackgroundColor, Camera2d, Commands, Entity, Font, IntoScheduleConfigs, NextState, Node,
+    App, BackgroundColor, Camera2d, Commands, Entity, Font, IntoScheduleConfigs, NextState, Node,
     OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Resource, Val, With, default, error,
     in_state,
 };
@@ -30,7 +30,7 @@ pub struct LoadingState {
 pub struct AssetPreloaderPlugin;
 
 impl Plugin for AssetPreloaderPlugin {
-    fn build(&self, app: &mut bevy::prelude::App) {
+    fn build(&self, app: &mut App) {
         app.init_resource::<UiAssets>()
             .init_resource::<LoadingState>()
             .add_systems(
@@ -50,25 +50,24 @@ fn preload_assets(
     mut ui_assets: ResMut<UiAssets>,
     mut loading_state: ResMut<LoadingState>,
 ) {
-    let mut handles = Vec::new();
+    let mut ui_images: Vec<Handle<Image>> = Vec::new();
     for i in 1..=30 {
         let path = format!("textures/animations/intro/{:04}.png", i);
-        let handle = asset_server.load(path);
-        handles.push(handle);
+        ui_images.push(asset_server.load(path));
     }
-    handles.push(asset_server.load("textures/ui/background.png"));
-    ui_assets.images = handles;
+    ui_images.push(asset_server.load("textures/ui/background.png"));
+    ui_assets.images = ui_images;
 
-    let mut audio_handles = Vec::new();
-    audio_handles.push(asset_server.load("sounds/intro.ogg"));
-    audio_handles.push(asset_server.load("sounds/menu-hover.wav"));
-    audio_handles.push(asset_server.load("sounds/menu-select.wav"));
-    ui_assets.sounds = audio_handles;
+    ui_assets.sounds = vec![
+        asset_server.load("sounds/intro.ogg"),
+        asset_server.load("sounds/menu-hover.wav"),
+        asset_server.load("sounds/menu-select.wav"),
+    ];
 
-    let mut font_handles = Vec::new();
-    font_handles.push(asset_server.load("fonts/inter-regular.ttf"));
-    font_handles.push(asset_server.load("fonts/inter-bold.ttf"));
-    ui_assets.fonts = font_handles;
+    ui_assets.fonts = vec![
+        asset_server.load("fonts/inter-regular.ttf"),
+        asset_server.load("fonts/inter-bold.ttf"),
+    ];
 
     loading_state.total = ui_assets.images.len() + ui_assets.sounds.len() + ui_assets.fonts.len();
     loading_state.loaded = 0;
