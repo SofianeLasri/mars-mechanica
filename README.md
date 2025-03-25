@@ -12,6 +12,10 @@ pour survivre et accomplir des objectifs.
 
 Les valeurs à "tweaker" sont dans le fichier `src/components/terrain.rs`.
 
+## Paramètres de démarrage
+
+- --skip-splash
+
 ## Problèmes connus
 
 - Le système de chunk casse le terrain en le coupant aux extrémités de la zone actualisée (lors d'une action).

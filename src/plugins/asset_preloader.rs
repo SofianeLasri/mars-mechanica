@@ -1,10 +1,17 @@
-use crate::components::{LoadingBar, LoadingProgress, UiCamera, LOADING_BAR_COLOR, LOADING_BAR_ERROR_COLOR, LOADING_PROGRESS_COLOR};
-use crate::GameState;
+use crate::components::{
+    LOADING_BAR_COLOR, LOADING_BAR_ERROR_COLOR, LOADING_PROGRESS_COLOR, LoadingBar,
+    LoadingProgress, UiCamera,
+};
+use crate::{CliArgs, GameState};
 use bevy::app::Update;
 use bevy::asset::{AssetServer, Handle, LoadState};
 use bevy::audio::AudioSource;
 use bevy::image::Image;
-use bevy::prelude::{default, error, in_state, BackgroundColor, Camera2d, Commands, Entity, Font, IntoScheduleConfigs, NextState, Node, OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Resource, Val, With};
+use bevy::prelude::{
+    BackgroundColor, Camera2d, Commands, Entity, Font, IntoScheduleConfigs, NextState, Node,
+    OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Resource, Val, With, default, error,
+    in_state,
+};
 
 #[derive(Resource, Default)]
 pub struct UiAssets {
@@ -101,6 +108,7 @@ fn check_assets_loaded(
     splash_assets: Res<UiAssets>,
     mut next_state: ResMut<NextState<GameState>>,
     mut loading_state: ResMut<LoadingState>,
+    cli_args: Res<CliArgs>,
 ) {
     let mut loaded = 0;
     let mut has_error = false;
@@ -138,7 +146,11 @@ fn check_assets_loaded(
     }
 
     if loaded == loading_state.total {
-        next_state.set(GameState::SplashScreen);
+        if cli_args.skip_splash {
+            next_state.set(GameState::MainMenu);
+        } else {
+            next_state.set(GameState::SplashScreen);
+        }
     }
 }
 
