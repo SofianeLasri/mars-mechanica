@@ -4,12 +4,7 @@ use bevy::app::Update;
 use bevy::asset::{AssetServer, Handle, LoadState};
 use bevy::audio::AudioSource;
 use bevy::image::Image;
-use bevy::log::error;
-use bevy::prelude::{
-    default, in_state, BackgroundColor, Camera2d, Commands, Entity, Font, IntoScheduleConfigs,
-    NextState, Node, OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Resource, Val,
-    With,
-};
+use bevy::prelude::{default, error, in_state, BackgroundColor, Camera2d, Commands, Entity, Font, IntoScheduleConfigs, NextState, Node, OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Resource, Val, With};
 
 #[derive(Resource, Default)]
 pub struct UiAssets {
