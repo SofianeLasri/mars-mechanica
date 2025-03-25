@@ -1,6 +1,4 @@
-use crate::components::{
-    BUTTON_HOVER_COLOR, ButtonAction, LoadingText, MenuButton, MenuRoot, SIDEBAR_COLOR, TEXT_COLOR,
-};
+use crate::components::{BUTTON_HOVER_COLOR, ButtonAction, LoadingText, MenuButton, MenuRoot, SIDEBAR_COLOR, TEXT_COLOR, UiSound, UiCamera};
 
 use crate::GameState;
 use crate::plugins::asset_preloader::UiAssets;
@@ -23,12 +21,6 @@ impl Plugin for UiPlugin {
             );
     }
 }
-
-#[derive(Component)]
-pub(crate) struct UiCamera;
-
-#[derive(Component)]
-struct UiSound;
 
 fn setup_main_menu(mut commands: Commands, ui_assets: Res<UiAssets>) {
     info!("Setting up main menu");

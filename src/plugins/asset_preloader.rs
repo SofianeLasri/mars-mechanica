@@ -1,7 +1,4 @@
-use crate::components::{
-    LoadingBar, LoadingProgress, LOADING_BAR_COLOR, LOADING_BAR_ERROR_COLOR, LOADING_PROGRESS_COLOR,
-};
-use crate::plugins::ui::UiCamera;
+use crate::components::{LoadingBar, LoadingProgress, UiCamera, LOADING_BAR_COLOR, LOADING_BAR_ERROR_COLOR, LOADING_PROGRESS_COLOR};
 use crate::GameState;
 use bevy::app::Update;
 use bevy::asset::{AssetServer, Handle, LoadState};

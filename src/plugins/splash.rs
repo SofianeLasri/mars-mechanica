@@ -1,38 +1,10 @@
 use crate::GameState;
 use crate::components::TEXT_COLOR;
+use crate::components::splash::{
+    InfoScreen, InfoText, SplashAnimation, SplashFrame, SplashPhase, SplashScreen,
+};
 use crate::plugins::asset_preloader::UiAssets;
 use bevy::prelude::*;
-
-#[derive(Resource)]
-struct SplashAnimation {
-    current_frame: usize,
-    phase: SplashPhase,
-    timer: Timer,
-}
-
-#[derive(Component)]
-struct SplashScreen;
-
-#[derive(Component)]
-struct SplashFrame {
-    index: usize,
-}
-
-#[derive(Component)]
-struct InfoText;
-
-#[derive(Component)]
-struct InfoScreen;
-
-// En fait comme je n'ai pas trouvé de décodeur vidéo simple d'utilisation,
-// j'ai décidé de faire une animation image par image, puis avec du code :)
-#[derive(Debug, PartialEq, Eq)]
-enum SplashPhase {
-    Glitch,     // 30 premières images (1s)
-    Hold,       // 1s de pause
-    FadeOut,    // 0.25s de fondu
-    InfoScreen, // 5s d'affichage
-}
 
 pub struct SplashPlugin;
 
