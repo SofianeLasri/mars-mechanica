@@ -231,7 +231,7 @@ fn handle_menu_buttons(
                 if let ButtonAction::GenerateWorld = button.action {
                     next_state.set(GameState::Loading)
                 } else if let ButtonAction::Quit = button.action {
-                    app_exit.send(AppExit::Success);
+                    app_exit.write(AppExit::Success);
                 }
             }
             Interaction::Hovered => {
@@ -277,7 +277,7 @@ pub fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuRoot>>
 
 fn cleanup_loading_screen(mut commands: Commands, query: Query<Entity, With<LoadingText>>) {
     for entity in &query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 

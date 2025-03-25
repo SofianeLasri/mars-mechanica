@@ -2,7 +2,6 @@ use crate::components::terrain::*;
 use crate::GameState;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
-use rand::prelude::*;
 use rand::random;
 use std::collections::HashSet;
 
@@ -34,7 +33,7 @@ pub fn generate_world(
 
     info!("World generated! Chunks: {}", chunk_map.chunks.len());
 
-    event_writer.send(UpdateTerrainEvent {
+    event_writer.write(UpdateTerrainEvent {
         region: None,
         chunk_coords: None,
     });
@@ -74,7 +73,7 @@ fn generate_chunk(
             commands.spawn((
                 Sprite::from_color(MARS_GROUND_COLOR, VEC2_CELL_SIZE),
                 Transform::from_xyz(coord_x as f32, coord_y as f32, 0.0),
-                TerrainCell { x: world_x, y: world_y },
+                TerrainCell,
                 TerrainChunk { chunk_x, chunk_y },
             ));
 
@@ -110,7 +109,6 @@ fn generate_chunk(
                 SolidObject {
                     material_id: material_id.clone(),
                     health: material_def.strength,
-                    max_health: material_def.strength,
                     mergeable: material_def.can_be_merged,
                     neighbors_pattern: 0,
                 },

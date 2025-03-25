@@ -1,7 +1,7 @@
-use crate::components::ControlledCamera;
 use crate::GameState;
-use bevy::input::mouse::{MouseButtonInput, MouseWheel};
+use crate::components::ControlledCamera;
 use bevy::input::ButtonState;
+use bevy::input::mouse::{MouseButtonInput, MouseWheel};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
@@ -9,8 +9,14 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::InGame), init.run_if(in_state(GameState::InGame)))
-            .add_systems(FixedUpdate, update_camera.run_if(in_state(GameState::InGame)));
+        app.add_systems(
+            OnEnter(GameState::InGame),
+            init.run_if(in_state(GameState::InGame)),
+        )
+        .add_systems(
+            FixedUpdate,
+            update_camera.run_if(in_state(GameState::InGame)),
+        );
     }
 }
 
@@ -20,7 +26,7 @@ pub fn init(mut commands: Commands) {
         ControlledCamera {
             zoom_speed: 0.1,
             min_zoom: 0.75, // Max zoom (+)
-            max_zoom: 4.0, // Max dezoom (-)
+            max_zoom: 4.0,  // Max dezoom (-)
             pan_speed: 1.0,
             is_panning: false,
             cursor_start_position: Vec2::new(0.0, 0.0),
@@ -30,11 +36,7 @@ pub fn init(mut commands: Commands) {
 }
 
 pub fn update_camera(
-    mut camera_query: Query<(
-        &mut Projection,
-        &mut Transform,
-        &mut ControlledCamera,
-    )>,
+    mut camera_query: Query<(&mut Projection, &mut Transform, &mut ControlledCamera)>,
     mut mouse_button_input_events: EventReader<MouseButtonInput>,
     mut mouse_wheel_events: EventReader<MouseWheel>,
     window_query: Query<&Window, With<PrimaryWindow>>,
@@ -73,8 +75,8 @@ fn handle_zoom(
 
         // On déstructure la Projection pour accéder à la variante Orthographique
         if let Projection::Orthographic(ortho_projection) = &mut **projection {
-            ortho_projection.scale = (ortho_projection.scale + zoom_delta)
-                .clamp(camera.min_zoom, camera.max_zoom);
+            ortho_projection.scale =
+                (ortho_projection.scale + zoom_delta).clamp(camera.min_zoom, camera.max_zoom);
         } else {
             warn!("The projection is not Orthographic");
         }
@@ -82,7 +84,11 @@ fn handle_zoom(
 }
 
 /// This method handle the movement of the camera using the cursor position, relative to the start position
-fn handle_movement(window_query: Query<&Window, With<PrimaryWindow>>, mut transform: Mut<Transform>, mut camera: Mut<ControlledCamera>) {
+fn handle_movement(
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    mut transform: Mut<Transform>,
+    mut camera: Mut<ControlledCamera>,
+) {
     let cursor_position = get_cursor_window_position(window_query);
 
     if camera.cursor_start_position == Vec2::new(0.0, 0.0) {
@@ -109,10 +115,13 @@ pub fn get_cursor_window_position(window_query: Query<&Window, With<PrimaryWindo
 }
 
 /// This method returns the cursor position in the world coordinates
-pub fn get_cursor_world_position(window_query: Query<&Window, With<PrimaryWindow>>, camera_query: Query<(&Camera, &GlobalTransform, &Projection)>) -> Vec2 {
+pub fn get_cursor_world_position(
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    camera_query: Query<(&Camera, &GlobalTransform, &Projection)>,
+) -> Vec2 {
     let cursor_position = get_cursor_window_position(window_query);
 
-    let Ok((camera, transform, projection)) = camera_query.single() else {
+    let Ok((_, transform, projection)) = camera_query.single() else {
         return Vec2::ZERO;
     };
 
@@ -124,6 +133,6 @@ pub fn get_cursor_world_position(window_query: Query<&Window, With<PrimaryWindow
                 translation.y - cursor_position.y * ortho.scale,
             )
         }
-        _ => Vec2::ZERO
+        _ => Vec2::ZERO,
     }
 }

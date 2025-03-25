@@ -211,11 +211,11 @@ fn update_solid_objects(
                     let drop_count = if material.drop_count_min == material.drop_count_max {
                         material.drop_count_min
                     } else {
-                        let mut rng = rand::thread_rng();
-                        rng.gen_range(material.drop_count_min..=material.drop_count_max)
+                        let mut rng = rand::rng();
+                        rng.random_range(material.drop_count_min..=material.drop_count_max)
                     };
 
-                    let item_entity = commands
+                    commands
                         .spawn((
                             Sprite {
                                 image: entity_def.icon.clone(),
@@ -228,8 +228,7 @@ fn update_solid_objects(
                                 entity_id: material.drop_entity_id.clone(),
                                 quantity: drop_count,
                             },
-                        ))
-                        .id();
+                        ));
 
                     let text_position = Vec3::new(
                         transform.translation.x,
@@ -496,7 +495,7 @@ fn remove_mask_overlays_from_parent(
     if let Ok(children) = children_query.get(parent) {
         for child in children.iter() {
             if mask_overlay_query.get(child).is_ok() {
-                commands.entity(child).despawn_recursive();
+                commands.entity(child).despawn();
             }
         }
     }
@@ -507,7 +506,7 @@ pub fn trigger_terrain_update(
     chunk_y: i32,
     mut event_writer: EventWriter<UpdateTerrainEvent>,
 ) {
-    event_writer.send(UpdateTerrainEvent {
+    event_writer.write(UpdateTerrainEvent {
         region: None,
         chunk_coords: Some((chunk_x, chunk_y)),
     });
@@ -532,9 +531,7 @@ fn spawn_border_masks(
     let has_top_right = (neighbors_pattern & NEIGHBOR_TOP_RIGHT) != 0;
     let has_bottom_left = (neighbors_pattern & NEIGHBOR_BOTTOM_LEFT) != 0;
     let has_bottom_right = (neighbors_pattern & NEIGHBOR_BOTTOM_RIGHT) != 0;
-
-    let debug_color = Color::srgb(1.0, 0.0, 0.0);
-
+    
     // --- Coins : si deux côtés adjacents sont présents, on ajoute un masque carré pour masquer le coin intérieur.
     // Par exemple, si il n'y a ni voisin en haut ni en gauche, on affiche un carré dans le coin supérieur gauche.
     if !has_top && !has_left && has_right && has_bottom && has_bottom_right {

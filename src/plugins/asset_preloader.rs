@@ -169,6 +169,6 @@ fn update_loading_bar(
 
 fn cleanup_loading_bar(mut commands: Commands, query: Query<Entity, With<LoadingBar>>) {
     for entity in &query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }

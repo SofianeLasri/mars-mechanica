@@ -4,10 +4,7 @@ use std::collections::{HashMap, HashSet};
 // --- COMPOSANTS ---
 
 #[derive(Component)]
-pub struct TerrainCell {
-    pub x: i32,
-    pub y: i32,
-}
+pub struct TerrainCell;
 
 #[derive(Component)]
 pub struct TerrainChunk {
@@ -19,9 +16,7 @@ pub struct TerrainChunk {
 pub struct SolidObject {
     pub material_id: String,
     pub health: f32,
-    pub max_health: f32,
     pub mergeable: bool,
-    // Stocke le pattern de voisinage pour déterminer quelle texture utiliser
     pub neighbors_pattern: u8,
 }
 

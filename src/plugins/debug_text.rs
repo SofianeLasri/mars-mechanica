@@ -54,7 +54,7 @@ pub fn init(
 }
 
 pub fn update_debug_camera_text(
-    mut text_query: Query<Entity, With<DebugCameraText>>,
+    text_query: Query<Entity, With<DebugCameraText>>,
     window_query: Query<&Window>,
     mut writer: TextUiWriter,
 ) {

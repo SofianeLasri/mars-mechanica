@@ -1,9 +1,12 @@
-use crate::components::{ChunkUtils, HoverState, SolidObject, TerrainChunk, UpdateTerrainEvent, CELL_SIZE, VEC2_CELL_SIZE};
+use crate::GameState;
+use crate::components::{
+    CELL_SIZE, ChunkUtils, HoverState, SolidObject, TerrainChunk, UpdateTerrainEvent,
+    VEC2_CELL_SIZE,
+};
 use crate::plugins::camera::get_cursor_world_position;
 use crate::plugins::debug_text::DebugHoverText;
-use crate::GameState;
-use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
+use bevy::input::mouse::MouseButtonInput;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
@@ -15,7 +18,13 @@ pub struct InteractionSprite;
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(GameState::InGame), init)
-            .add_systems(FixedUpdate, (hover_detection.run_if(in_state(GameState::InGame)), block_click_handler.run_if(in_state(GameState::InGame))));
+            .add_systems(
+                FixedUpdate,
+                (
+                    hover_detection.run_if(in_state(GameState::InGame)),
+                    block_click_handler.run_if(in_state(GameState::InGame)),
+                ),
+            );
     }
 }
 
@@ -31,7 +40,13 @@ pub fn hover_detection(
     window_query: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform, &Projection)>,
     mut solid_objects_query: Query<
-        (Entity, &Transform, Option<&HoverState>, &SolidObject, &TerrainChunk),
+        (
+            Entity,
+            &Transform,
+            Option<&HoverState>,
+            &SolidObject,
+            &TerrainChunk,
+        ),
         With<SolidObject>,
     >,
     mut interaction_sprite_query: Query<Entity, With<InteractionSprite>>,
@@ -144,7 +159,13 @@ fn update_debug_text(
 fn reset_solid_objects_hover_state(
     commands: &mut Commands,
     solid_objects_query: &mut Query<
-        (Entity, &Transform, Option<&HoverState>, &SolidObject, &TerrainChunk),
+        (
+            Entity,
+            &Transform,
+            Option<&HoverState>,
+            &SolidObject,
+            &TerrainChunk,
+        ),
         With<SolidObject>,
     >,
 ) {
@@ -158,26 +179,22 @@ fn reset_solid_objects_hover_state(
 /// This system will destroy a block when the player clicks on it
 pub fn block_click_handler(
     mut mouse_button_events: EventReader<MouseButtonInput>,
-    mut solid_objects_query: Query<(Entity, &mut SolidObject, Option<&HoverState>, &TerrainChunk)>,
+    mut solid_objects_query: Query<(&mut SolidObject, Option<&HoverState>, &TerrainChunk)>,
     mut update_terrain_events: EventWriter<UpdateTerrainEvent>,
 ) {
     for event in mouse_button_events.read() {
-        // Vérifier si c'est un clic gauche
         if event.button == MouseButton::Left && event.state == ButtonState::Pressed {
-            // Trouver et détruire le bloc survolé
-            for (entity, mut solid_object, hover_state, chunk) in solid_objects_query.iter_mut() {
+            for (mut solid_object, hover_state, chunk) in solid_objects_query.iter_mut() {
                 if let Some(hover) = hover_state {
                     if hover.hovered {
-                        // Détruire le bloc en réduisant sa santé à 0
                         solid_object.health = 0.0;
 
-                        // Déclencher une mise à jour du terrain pour ce chunk uniquement
-                        update_terrain_events.send(UpdateTerrainEvent {
+                        update_terrain_events.write(UpdateTerrainEvent {
                             region: None,
                             chunk_coords: Some((chunk.chunk_x, chunk.chunk_y)),
                         });
 
-                        break; // Ne détruire qu'un seul bloc par clic
+                        break;
                     }
                 }
             }
