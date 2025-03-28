@@ -1,9 +1,9 @@
-use crate::GameState;
-use crate::components::TEXT_COLOR;
 use crate::components::splash::{
     InfoScreen, InfoText, SplashAnimation, SplashFrame, SplashPhase, SplashScreen,
 };
+use crate::components::TEXT_COLOR;
 use crate::plugins::asset_preloader::UiAssets;
+use crate::GameState;
 use bevy::prelude::*;
 
 pub struct SplashPlugin;
@@ -59,16 +59,50 @@ fn setup_splash(mut commands: Commands, ui_assets: Res<UiAssets>) {
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Start,
-                padding: UiRect::all(Val::Px(96.0)),
+                justify_content: JustifyContent::Center,
+                padding: UiRect::all(Val::Px(128.0)),
                 ..default()
             },
             Visibility::Hidden,
             InfoScreen,
             children![(
-                Text::new("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."),
+                Text::new("2025 - Sofiane Lasri-Trienpont"),
                 TextFont {
                     font: ui_assets.fonts.first().unwrap().clone(),
-                    font_size: 24.0,
+                    font_size: 18.0,
+                    line_height: Default::default(),
+                    font_smoothing: Default::default(),
+                },
+                TextColor(TEXT_COLOR),
+                InfoText,
+            ),
+            (
+                Text::new("Master 2 Dev Manager Full-Stack, Efrei Paris"),
+                TextFont {
+                    font: ui_assets.fonts.first().unwrap().clone(),
+                    font_size: 18.0,
+                    line_height: Default::default(),
+                    font_smoothing: Default::default(),
+                },
+                TextColor(TEXT_COLOR),
+                InfoText,
+            ),
+            (
+                Text::new("Mars Mechanica est un projet développé dans le cadre du module Rust & WebAssembly. Développé avec le langage Rust et le moteur Bevy, ce projet intègre des textures provenant du jeu Rimworld créé par Ludeon Studios, ainsi que des fichiers sons du jeu Grand Theft Auto V créé par Rockstar Games."),
+                TextFont {
+                    font: ui_assets.fonts.first().unwrap().clone(),
+                    font_size: 18.0,
+                    line_height: Default::default(),
+                    font_smoothing: Default::default(),
+                },
+                TextColor(TEXT_COLOR),
+                InfoText,
+            ),
+            (
+                Text::new("Ce projet n’a pas de vocation commerciale et est soumis à la licence Creative Commons BY-NC-SA."),
+                TextFont {
+                    font: ui_assets.fonts.first().unwrap().clone(),
+                    font_size: 18.0,
                     line_height: Default::default(),
                     font_smoothing: Default::default(),
                 },
