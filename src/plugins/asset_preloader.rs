@@ -1,6 +1,6 @@
 use crate::components::{LoadingBar, LoadingProgress, TerrainAssets, UiAssets, UiCamera, LOADING_BAR_COLOR, LOADING_BAR_ERROR_COLOR, LOADING_PROGRESS_COLOR};
 use crate::{CliArgs, GameState};
-use bevy::app::Update;
+use bevy::app::FixedUpdate;
 use bevy::asset::{AssetServer, Handle, LoadState};
 use bevy::image::Image;
 use bevy::prelude::{
@@ -29,7 +29,7 @@ impl Plugin for AssetPreloaderPlugin {
                 (preload_assets, setup_loading_bar),
             )
             .add_systems(
-                Update,
+                FixedUpdate,
                 (check_assets_loaded, update_loading_bar).run_if(in_state(GameState::AssetLoading)),
             )
             .add_systems(OnExit(GameState::AssetLoading), cleanup_loading_bar);
