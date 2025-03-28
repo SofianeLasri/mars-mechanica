@@ -1,8 +1,7 @@
 use crate::components::splash::{
     InfoScreen, InfoText, SplashAnimation, SplashFrame, SplashPhase, SplashScreen,
 };
-use crate::components::TEXT_COLOR;
-use crate::plugins::asset_preloader::UiAssets;
+use crate::components::{UiAssets, TEXT_COLOR};
 use crate::GameState;
 use bevy::prelude::*;
 

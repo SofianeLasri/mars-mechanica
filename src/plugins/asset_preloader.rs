@@ -1,24 +1,14 @@
-use crate::components::{
-    LOADING_BAR_COLOR, LOADING_BAR_ERROR_COLOR, LOADING_PROGRESS_COLOR, LoadingBar,
-    LoadingProgress, UiCamera, WorldEntities, WorldMaterials,
-};
+use crate::components::{LoadingBar, LoadingProgress, TerrainAssets, UiAssets, UiCamera, LOADING_BAR_COLOR, LOADING_BAR_ERROR_COLOR, LOADING_PROGRESS_COLOR};
 use crate::{CliArgs, GameState};
 use bevy::app::Update;
 use bevy::asset::{AssetServer, Handle, LoadState};
-use bevy::audio::AudioSource;
 use bevy::image::Image;
 use bevy::prelude::{
-    App, BackgroundColor, Camera2d, Commands, Entity, Font, IntoScheduleConfigs, NextState, Node,
-    OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Resource, Val, With, default, error,
-    in_state,
+    default, error, in_state, App, BackgroundColor, Camera2d, Commands, Entity, Font,
+    IntoScheduleConfigs, NextState, Node, OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Resource, Val,
+    With,
 };
-
-#[derive(Resource, Default)]
-pub struct UiAssets {
-    pub(crate) images: Vec<Handle<Image>>,
-    pub(crate) sounds: Vec<Handle<AudioSource>>,
-    pub(crate) fonts: Vec<Handle<Font>>,
-}
+use std::collections::HashMap;
 
 #[derive(Resource, Default)]
 pub struct LoadingState {
@@ -31,7 +21,8 @@ pub struct AssetPreloaderPlugin;
 
 impl Plugin for AssetPreloaderPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<UiAssets>()
+        app.init_resource::<TerrainAssets>()
+            .init_resource::<UiAssets>()
             .init_resource::<LoadingState>()
             .add_systems(
                 OnEnter(GameState::AssetLoading),
@@ -48,6 +39,7 @@ impl Plugin for AssetPreloaderPlugin {
 fn preload_assets(
     asset_server: Res<AssetServer>,
     mut ui_assets: ResMut<UiAssets>,
+    mut terrain_assets: ResMut<TerrainAssets>,
     mut loading_state: ResMut<LoadingState>,
 ) {
     let mut ui_images: Vec<Handle<Image>> = Vec::new();
@@ -69,7 +61,43 @@ fn preload_assets(
         asset_server.load("fonts/inter-bold.ttf"),
     ];
 
-    loading_state.total = ui_assets.images.len() + ui_assets.sounds.len() + ui_assets.fonts.len();
+    let material_ids = vec!["rock", "basalt", "olivine", "red_crystal"];
+    let sprite_names = vec![
+        "alone",
+        "bottom-right",
+        "bottom",
+        "left-bottom-right",
+        "left-bottom",
+        "left-right",
+        "top-left",
+        "left",
+        "right",
+        "top-bottom-right",
+        "top-bottom",
+        "top-left-bottom-right",
+        "top-left-bottom",
+        "top-left-right",
+        "top-right",
+        "top",
+    ];
+
+    let mut terrain_materials: HashMap<String, HashMap<String, Handle<Image>>> = HashMap::new();
+    let mut terrain_asset_count = 0;
+    for material in material_ids.iter() {
+        let mut sprites: HashMap<String, Handle<Image>> = HashMap::new();
+        for sprite_name in sprite_names.iter() {
+            let path = format!("textures/terrain/{}/{}.png", material, sprite_name);
+            sprites.insert(sprite_name.to_string(), asset_server.load(path));
+            terrain_asset_count += 1;
+        }
+        terrain_materials.insert(material.to_string(), sprites);
+    }
+    terrain_assets.materials = terrain_materials;
+
+    loading_state.total = ui_assets.images.len()
+        + ui_assets.sounds.len()
+        + ui_assets.fonts.len()
+        + terrain_asset_count;
     loading_state.loaded = 0;
     loading_state.error = false;
 }
@@ -105,6 +133,7 @@ fn setup_loading_bar(mut commands: Commands) {
 fn check_assets_loaded(
     asset_server: Res<AssetServer>,
     splash_assets: Res<UiAssets>,
+    terrain_assets: Res<TerrainAssets>,
     mut next_state: ResMut<NextState<GameState>>,
     mut loading_state: ResMut<LoadingState>,
     cli_args: Res<CliArgs>,
@@ -133,6 +162,16 @@ fn check_assets_loaded(
             LoadState::Loaded => loaded += 1,
             LoadState::Failed(_) => has_error = true,
             _ => {}
+        }
+    }
+
+    for (_material, sprites_map) in terrain_assets.materials.iter() {
+        for (_sprite_name, handle) in sprites_map.iter() {
+            match asset_server.get_load_state(handle).unwrap() {
+                LoadState::Loaded => loaded += 1,
+                LoadState::Failed(_) => has_error = true,
+                _ => {}
+            }
         }
     }
 

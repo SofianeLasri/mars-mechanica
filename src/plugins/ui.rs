@@ -1,7 +1,6 @@
-use crate::components::{BUTTON_HOVER_COLOR, ButtonAction, LoadingText, MenuButton, MenuRoot, SIDEBAR_COLOR, TEXT_COLOR, UiSound, UiCamera};
+use crate::components::{ButtonAction, LoadingText, MenuButton, MenuRoot, UiAssets, UiCamera, UiSound, BUTTON_HOVER_COLOR, SIDEBAR_COLOR, TEXT_COLOR};
 
 use crate::GameState;
-use crate::plugins::asset_preloader::UiAssets;
 use bevy::prelude::*;
 
 pub struct UiPlugin;

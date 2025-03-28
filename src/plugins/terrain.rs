@@ -1,10 +1,4 @@
-use crate::components::{
-    ChunkMap, ChunkUtils, ControlledCamera, EntitiesToDespawn, EntityDefinition, ItemText,
-    MaskOverlay, MaterialDefinition, SolidObject, UpdateTerrainEvent, WorldEntities, WorldEntityItem,
-    WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM,
-    NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP,
-    NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE,
-};
+use crate::components::{ChunkMap, ChunkUtils, ControlledCamera, EntitiesToDespawn, EntityDefinition, ItemText, MaskOverlay, MaterialDefinition, SolidObject, TerrainAssets, UpdateTerrainEvent, WorldEntities, WorldEntityItem, WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE};
 use crate::GameState;
 use bevy::prelude::*;
 use bevy::text::{JustifyText, TextColor, TextFont, TextLayout};
@@ -45,6 +39,7 @@ fn init_world_definitions(
     mut world_materials: ResMut<WorldMaterials>,
     mut world_entities: ResMut<WorldEntities>,
     asset_server: Res<AssetServer>,
+    terrain_assets: Res<TerrainAssets>,
 ) {
     info!("Initialising world definitions...");
 
@@ -61,7 +56,7 @@ fn init_world_definitions(
             drop_count_max: 3,
             can_be_merged: true,
             rarity: 0.0, // Très commun
-            sprites: load_material_sprites(&asset_server, "rock"),
+            sprites: load_material_sprites(&terrain_assets, "rock"),
             color: Color::srgb(85.0 / 255.0, 51.0 / 255.0, 36.0 / 255.0), // #553324
         },
     );
@@ -76,7 +71,7 @@ fn init_world_definitions(
             drop_count_max: 2,
             can_be_merged: true,
             rarity: 0.6, // Assez rare
-            sprites: load_material_sprites(&asset_server, "basalt"),
+            sprites: load_material_sprites(&terrain_assets, "basalt"),
             color: Color::srgb(47.0 / 255.0, 47.0 / 255.0, 47.0 / 255.0), // #2F2F2F
         },
     );
@@ -91,7 +86,7 @@ fn init_world_definitions(
             drop_count_max: 1,
             can_be_merged: true, // Apparaît toujours comme des cristaux individuels
             rarity: 0.8,         // Très rare
-            sprites: load_material_sprites(&asset_server, "olivine"),
+            sprites: load_material_sprites(&terrain_assets, "olivine"),
             color: Color::srgb(33.0 / 255.0, 72.0 / 255.0, 40.0 / 255.0), // #214828
         },
     );
@@ -106,7 +101,7 @@ fn init_world_definitions(
             drop_count_max: 1,
             can_be_merged: false, // Apparaît toujours comme des cristaux individuels
             rarity: 0.95,         // Très très rare
-            sprites: load_material_sprites(&asset_server, "red_crystal"),
+            sprites: load_material_sprites(&terrain_assets, "red_crystal"),
             color: Color::srgb(189.0 / 255.0, 36.0 / 255.0, 36.0 / 255.0), // #bd2424
         },
     );
@@ -160,37 +155,10 @@ fn init_world_definitions(
 
 /// This method loads the material sprites from the asset server
 pub fn load_material_sprites(
-    asset_server: &Res<AssetServer>,
+    terrain_assets: &Res<TerrainAssets>,
     material_id: &str,
 ) -> HashMap<String, Handle<Image>> {
-    let mut sprites: HashMap<String, Handle<Image>> = HashMap::new();
-
-    let sprite_names = [
-        "alone",
-        "bottom-right",
-        "bottom",
-        "left-bottom-right",
-        "left-bottom",
-        "left-right",
-        "top-left",
-        "left",
-        "right",
-        "top-bottom-right",
-        "top-bottom",
-        "top-left-bottom-right",
-        "top-left-bottom",
-        "top-left-right",
-        "top-right",
-        "top",
-    ];
-
-    for name in sprite_names.iter() {
-        let path = format!("textures/terrain/{}/{}.png", material_id, name);
-        sprites.insert(name.to_string(), asset_server.load(&path));
-        info!("Loaded sprite: {}", path);
-    }
-
-    sprites
+    terrain_assets.materials.get(material_id).cloned().unwrap_or_default()
 }
 
 /// Système pour mettre à jour les objets solides (détruire si health = 0)
