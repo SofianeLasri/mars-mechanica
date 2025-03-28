@@ -77,6 +77,10 @@ fn setup_splash(mut commands: Commands, ui_assets: Res<UiAssets>) {
                 InfoText,
             ),
             (
+                Node {
+                    margin: UiRect::bottom(Val::Px(16.0)),
+                    ..default()
+                },
                 Text::new("Master 2 Dev Manager Full-Stack, Efrei Paris"),
                 TextFont {
                     font: ui_assets.fonts.first().unwrap().clone(),
