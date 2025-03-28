@@ -4,7 +4,7 @@ use bevy::app::Update;
 use bevy::asset::{AssetServer, Handle, LoadState};
 use bevy::image::Image;
 use bevy::prelude::{
-    default, error, in_state, App, BackgroundColor, Camera2d, Commands, Entity, Font,
+    default, error, in_state, App, BackgroundColor, Camera2d, Commands, Entity,
     IntoScheduleConfigs, NextState, Node, OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Resource, Val,
     With,
 };
