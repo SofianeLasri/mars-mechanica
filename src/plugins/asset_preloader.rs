@@ -3,6 +3,7 @@ use crate::{CliArgs, GameState};
 use bevy::app::FixedUpdate;
 use bevy::asset::{AssetServer, Handle, LoadState};
 use bevy::image::Image;
+use bevy::log::info;
 use bevy::prelude::{
     default, error, in_state, App, BackgroundColor, Camera2d, Commands, Entity,
     IntoScheduleConfigs, NextState, Node, OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Resource, Val,
@@ -100,6 +101,7 @@ fn preload_assets(
         + terrain_asset_count;
     loading_state.loaded = 0;
     loading_state.error = false;
+    info!("Loading {} assets", loading_state.total);
 }
 
 fn setup_loading_bar(mut commands: Commands) {
@@ -184,7 +186,9 @@ fn check_assets_loaded(
     }
 
     if loaded == loading_state.total {
+        info!("All assets loaded");
         if cli_args.skip_splash {
+            info!("Skipping splash screen");
             next_state.set(GameState::MainMenu);
         } else {
             next_state.set(GameState::SplashScreen);
