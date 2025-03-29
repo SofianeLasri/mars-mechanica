@@ -1,12 +1,12 @@
-use crate::GameState;
 use crate::components::{
-    CELL_SIZE, ChunkUtils, HoverState, SolidObject, TerrainChunk, UpdateTerrainEvent,
+    ChunkUtils, HoverState, SolidObject, TerrainChunk, UpdateTerrainEvent, CELL_SIZE,
     VEC2_CELL_SIZE,
 };
 use crate::plugins::camera::get_cursor_world_position;
-use crate::plugins::debug_text::DebugHoverText;
-use bevy::input::ButtonState;
+use crate::plugins::debug_ui::DebugHoverText;
+use crate::GameState;
 use bevy::input::mouse::MouseButtonInput;
+use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 

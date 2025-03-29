@@ -1,6 +1,6 @@
 pub mod entity;
 pub mod terrain;
-pub mod debug_text;
+pub mod debug_ui;
 pub mod interaction;
 pub mod camera;
 pub mod ui;

@@ -1,5 +1,5 @@
 use crate::plugins::camera::CameraPlugin;
-use crate::plugins::debug_text::DebugTextPlugin;
+use crate::plugins::debug_ui::DebugUiPlugin;
 use crate::plugins::entity::EntityPlugin;
 use crate::plugins::interaction::InteractionPlugin;
 use crate::plugins::terrain::TerrainPlugin;
@@ -15,7 +15,7 @@ impl Plugin for GamePlugin {
             EntityPlugin,
             CameraPlugin,
             TerrainPlugin,
-            DebugTextPlugin,
+            DebugUiPlugin,
             InteractionPlugin,
         ))
             .add_systems(OnEnter(GameState::Loading), generate_world);
