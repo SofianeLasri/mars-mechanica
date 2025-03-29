@@ -69,7 +69,7 @@ fn spawn_debug_text<M: Component>(
     spawner.spawn((
         Text::new(text_content),
         TextFont {
-            font: ui_assets.fonts.first().unwrap().clone(),
+            font: ui_assets.fonts.last().unwrap().clone(),
             font_size: 14.0,
             ..default()
         },

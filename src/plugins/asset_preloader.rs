@@ -60,6 +60,7 @@ fn preload_assets(
     ui_assets.fonts = vec![
         asset_server.load("fonts/inter-regular.ttf"),
         asset_server.load("fonts/inter-bold.ttf"),
+        asset_server.load("fonts/jetbrains-mono-regular.ttf"),
     ];
 
     let material_ids = vec!["rock", "basalt", "olivine", "red_crystal"];

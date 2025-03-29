@@ -48,7 +48,7 @@ fn setup_main_menu(mut commands: Commands, ui_assets: Res<UiAssets>) {
     let game_title = (
         Text::new("Mars Mechanica"),
         TextFont {
-            font: ui_assets.fonts.last().unwrap().clone(),
+            font: ui_assets.fonts[1].clone(),
             font_size: 36.0,
             line_height: Default::default(),
             font_smoothing: Default::default(),
