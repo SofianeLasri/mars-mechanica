@@ -187,6 +187,24 @@ fn spawn_bar_column(
         });
 }
 
+/// Spawns a section in the toolbox with a title and a builder function.
+///
+/// # Arguments
+/// * `spawner` - The spawner to use for creating the UI elements.
+/// * `ui_assets` - The UI assets to use for the font.
+/// * `section_title` - The title of the section.
+/// * `build_section` - A closure that builds the contents of the section.
+///
+/// The closure receives a mutable reference to the spawner and the UI assets.
+/// It is expected to spawn the UI elements for the section.
+///
+/// # Example:
+/// ```rust
+/// spawn_toolbox_section(content_spawner, &ui_assets, "SectionTitle", |section_spawner, ui_assets| {
+///     spawn_toolbox_property(section_spawner, ui_assets, "Property 1", true);
+///     spawn_toolbox_property(section_spawner, ui_assets, "Property 2", false);
+/// });
+/// ````
 fn spawn_toolbox_section(
     spawner: &mut RelatedSpawnerCommands<ChildOf>,
     ui_assets: &UiAssets,
@@ -226,6 +244,18 @@ fn spawn_toolbox_section(
         });
 }
 
+/// Spawns a property in the toolbox with a checkbox and label.
+///
+/// # Arguments
+/// * `spawner` - The spawner to use for creating the UI elements.
+/// * `ui_assets` - The UI assets to use for the font.
+/// * `label_text` - The text to display next to the checkbox.
+/// * `initial_state` - The initial state of the checkbox (checked or unchecked).
+///
+/// # Example:
+/// ```rust
+/// spawn_toolbox_property(spawner, &ui_assets, "Property Name", true);
+/// ```
 fn spawn_toolbox_property(
     spawner: &mut RelatedSpawnerCommands<ChildOf>,
     ui_assets: &UiAssets,
