@@ -6,14 +6,18 @@ use bevy::ui::{FlexDirection, UiRect};
 use crate::components::UiAssets;
 use crate::GameState;
 
+// Existing debug text marker components
 #[derive(Component)]
 pub struct DebugCameraText;
-
 #[derive(Component)]
 pub struct DebugHoverText;
-
 #[derive(Component)]
 struct FpsCounterText;
+
+#[derive(Component)]
+pub struct ToolboxToggle {
+    pub value: bool,
+}
 
 pub struct DebugUiPlugin;
 
@@ -25,11 +29,11 @@ impl Plugin for DebugUiPlugin {
         )
             .add_systems(
                 FixedUpdate,
-                (update_debug_camera_text).run_if(in_state(GameState::InGame)),
+                update_debug_camera_text.run_if(in_state(GameState::InGame)),
             )
             .add_systems(
                 Update,
-                (update_fps_counter).run_if(in_state(GameState::InGame)),
+                update_fps_counter.run_if(in_state(GameState::InGame)),
             );
     }
 }
@@ -51,40 +55,41 @@ fn init_debug_bar(mut commands: Commands, ui_assets: Res<UiAssets>) {
         ))
         .id();
 
-    commands
-        .entity(root_entity)
-        .with_related::<ChildOf>(|child_spawner| {
-            spawn_bar_column(child_spawner, |col_spawner| {
-                spawn_bar_text(
-                    col_spawner,
-                    &ui_assets,
-                    "Mouse position: (0.0, 0.0)",
-                    DebugCameraText,
-                );
-                spawn_bar_text(
-                    col_spawner,
-                    &ui_assets,
-                    "Hovered cell: None",
-                    DebugHoverText,
-                );
-            });
-
-            spawn_bar_column(child_spawner, |col_spawner| {
-                spawn_bar_text(col_spawner, &ui_assets, "FPS: --", FpsCounterText);
-            });
+    commands.entity(root_entity).with_related::<ChildOf>(|child_spawner| {
+        spawn_bar_column(child_spawner, |col_spawner| {
+            spawn_bar_text(
+                col_spawner,
+                &ui_assets,
+                "Mouse position: (0.0, 0.0)",
+                DebugCameraText,
+            );
+            spawn_bar_text(
+                col_spawner,
+                &ui_assets,
+                "Hovered cell: None",
+                DebugHoverText,
+            );
         });
+
+        spawn_bar_column(child_spawner, |col_spawner| {
+            spawn_bar_text(col_spawner, &ui_assets, "FPS: --", FpsCounterText);
+        });
+    });
 }
 
+// TODO: Voir pour utiliser bevy_mod_imgui lorsque le paquet sera compatible avec Bevy 0.16
 fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
     let toolbox_root = commands
-        .spawn((Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(16.0),
-            right: Val::Px(16.0),
-            width: Val::Px(255.0),
-            flex_direction: FlexDirection::Column,
-            ..default()
-        },))
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(16.0),
+                right: Val::Px(16.0),
+                width: Val::Px(255.0),
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+        ))
         .id();
 
     let toolbox_title = (
@@ -121,103 +126,30 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
         BackgroundColor(Color::srgba(76.0 / 255.0, 76.0 / 255.0, 76.0 / 255.0, 0.9)),
     );
 
-    commands
-        .entity(toolbox_root)
-        .with_related::<ChildOf>(|child_spawner| {
-            child_spawner.spawn(toolbox_title);
-            child_spawner
-                .spawn(toolbox_content)
-                .with_related::<ChildOf>(|content_spawner| {
-                    // Section
-                    content_spawner.spawn((
-                        Node {
-                            flex_direction: FlexDirection::Column,
-                            row_gap: Val::Px(4.0),
-                            ..default()
-                        },
-                        children![
-                            // Section title
-                            (
-                                Text::new("Cell Mouse Selection"),
-                                TextFont {
-                                    font: ui_assets.fonts.last().unwrap().clone(),
-                                    font_size: 14.0,
-                                    ..default()
-                                },
-                                TextColor(Color::WHITE),
-                            ),
-                            // Section content
-                            (
-                                Node {
-                                    flex_direction: FlexDirection::Column,
-                                    row_gap: Val::Px(4.0),
-                                    ..default()
-                                },
-                                children![
-                                    (
-                                        // Property
-                                        Node {
-                                            flex_direction: FlexDirection::Row,
-                                            column_gap: Val::Px(4.0),
-                                            ..default()
-                                        },
-                                        children![
-                                            (
-                                                // Checked checkbox
-                                                Node {
-                                                    width: Val::Px(16.0),
-                                                    height: Val::Px(16.0),
-                                                    ..default()
-                                                },
-                                                BackgroundColor(Color::srgba(0.0, 1.0, 0.0, 1.0)),
-                                            ),
-                                            (
-                                                // Label
-                                                Text::new("Solid Objects"),
-                                                TextFont {
-                                                    font: ui_assets.fonts.last().unwrap().clone(),
-                                                    font_size: 14.0,
-                                                    ..default()
-                                                },
-                                                TextColor(Color::WHITE),
-                                            )
-                                        ],
-                                    ),
-                                    (
-                                        // Property
-                                        Node {
-                                            flex_direction: FlexDirection::Row,
-                                            column_gap: Val::Px(4.0),
-                                            ..default()
-                                        },
-                                        children![
-                                            (
-                                                // Unchecked checkbox
-                                                Node {
-                                                    width: Val::Px(16.0),
-                                                    height: Val::Px(16.0),
-                                                    ..default()
-                                                },
-                                                BackgroundColor(Color::srgba(1.0, 0.0, 0.0, 1.0)),
-                                            ),
-                                            (
-                                                // Label
-                                                Text::new("Entities"),
-                                                TextFont {
-                                                    font: ui_assets.fonts.last().unwrap().clone(),
-                                                    font_size: 14.0,
-                                                    ..default()
-                                                },
-                                                TextColor(Color::WHITE),
-                                            )
-                                        ],
-                                    )
-                                ],
-                            )
-                        ],
-                    ));
+    commands.entity(toolbox_root).with_related::<ChildOf>(|child_spawner| {
+        child_spawner.spawn(toolbox_title);
+        child_spawner
+            .spawn(toolbox_content)
+            .with_related::<ChildOf>(|content_spawner| {
+                spawn_toolbox_section(content_spawner, &ui_assets, "Cell Mouse Selection", |section_spawner, ui_assets| {
+                    spawn_toolbox_property(section_spawner, ui_assets, "Solid Objects", true);
+                    spawn_toolbox_property(section_spawner, ui_assets, "Entities", false);
                 });
-        });
+
+                spawn_toolbox_section(content_spawner, &ui_assets, "Click Action", |section_spawner, ui_assets| {
+                    spawn_toolbox_property(section_spawner, ui_assets, "Destroy", true);
+                    spawn_toolbox_property(section_spawner, ui_assets, "Place Solid Object", false);
+                    spawn_toolbox_property(section_spawner, ui_assets, "Place Entity", false);
+                });
+
+                spawn_toolbox_section(content_spawner, &ui_assets, "Solid Objects", |section_spawner, ui_assets| {
+                    spawn_toolbox_property(section_spawner, ui_assets, "Rock", true);
+                    spawn_toolbox_property(section_spawner, ui_assets, "Olivine", false);
+                    spawn_toolbox_property(section_spawner, ui_assets, "Basalt", false);
+                    spawn_toolbox_property(section_spawner, ui_assets, "Red Crystal", false);
+                });
+            });
+    });
 }
 
 fn spawn_bar_text<M: Component>(
@@ -243,13 +175,97 @@ fn spawn_bar_column(
     spawn_contents: impl FnOnce(&mut RelatedSpawnerCommands<ChildOf>),
 ) {
     spawner
-        .spawn((Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(4.0),
-            ..default()
-        },))
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(4.0),
+                ..default()
+            },
+        ))
         .with_related::<ChildOf>(|col_spawner| {
             spawn_contents(col_spawner);
+        });
+}
+
+fn spawn_toolbox_section(
+    spawner: &mut RelatedSpawnerCommands<ChildOf>,
+    ui_assets: &UiAssets,
+    section_title: &str,
+    build_section: impl FnOnce(&mut RelatedSpawnerCommands<ChildOf>, &UiAssets),
+) {
+    spawner
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(4.0),
+                ..default()
+            },
+        ))
+        .with_related::<ChildOf>(|section_spawner| {
+            section_spawner.spawn((
+                Text::new(section_title),
+                TextFont {
+                    font: ui_assets.fonts.last().unwrap().clone(),
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+
+            section_spawner
+                .spawn((
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(4.0),
+                        ..default()
+                    },
+                ))
+                .with_related::<ChildOf>(|props_spawner| {
+                    build_section(props_spawner, ui_assets);
+                });
+        });
+}
+
+fn spawn_toolbox_property(
+    spawner: &mut RelatedSpawnerCommands<ChildOf>,
+    ui_assets: &UiAssets,
+    label_text: &str,
+    initial_state: bool,
+) {
+    spawner
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(4.0),
+                ..default()
+            },
+        ))
+        .with_related::<ChildOf>(|row_spawner| {
+            let checkbox_color = if initial_state {
+                Color::srgba(0.0, 1.0, 0.0, 1.0)
+            } else {
+                Color::srgba(1.0, 0.0, 0.0, 1.0)
+            };
+
+            row_spawner.spawn((
+                Node {
+                    width: Val::Px(16.0),
+                    height: Val::Px(16.0),
+                    ..default()
+                },
+                BackgroundColor(checkbox_color),
+                ToolboxToggle { value: initial_state },
+            ));
+
+            row_spawner.spawn((
+                Text::new(label_text),
+                TextFont {
+                    font: ui_assets.fonts.last().unwrap().clone(),
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
         });
 }
 
