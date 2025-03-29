@@ -1,20 +1,24 @@
 use crate::components::terrain::*;
 use crate::GameState;
+use bevy::prelude::{info, Commands, EventWriter, NextState, Query, Res, ResMut, TextUiWriter, Transform, With};
+use bevy_sprite::Sprite;
 use noise::{NoiseFn, Perlin};
 use rand::random;
 use std::collections::HashSet;
-use bevy::prelude::{info, Commands, EventWriter, NextState, Res, ResMut, Transform};
-use bevy_sprite::Sprite;
 
 pub fn generate_world(
     mut commands: Commands,
     world_materials: Res<WorldMaterials>,
     mut chunk_map: ResMut<ChunkMap>,
     mut event_writer: EventWriter<UpdateTerrainEvent>,
-    mut next_state: ResMut<NextState<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>
 ) {
-    let terrain_noise = Perlin::new(random());
-    let material_noise = Perlin::new(random());
+    let world_seed = random::<u32>();
+    let terrain_noise = Perlin::new(world_seed);
+    let material_noise = Perlin::new(world_seed);
+
+    commands.insert_resource(WorldSeed(world_seed));
+    info!("World seed: {}", world_seed);
 
     info!("Generating world...");
 

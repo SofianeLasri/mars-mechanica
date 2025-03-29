@@ -90,6 +90,9 @@ pub struct EntityDefinition {
 #[derive(Resource, Default)]
 pub struct EntitiesToDespawn(pub(crate) Vec<Entity>);
 
+#[derive(Resource)]
+pub struct WorldSeed(pub u32);
+
 // --- CONSTANTES ---
 
 /// Number of blocks in each chunk.

@@ -1,9 +1,10 @@
 use bevy::color::palettes::css::BLACK;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
+use bevy::render::renderer::RenderAdapterInfo;
 use bevy::ui::{FlexDirection, Interaction, UiRect};
 
-use crate::components::UiAssets;
+use crate::components::{UiAssets, WorldSeed};
 use crate::GameState;
 
 // Existing debug text marker components
@@ -13,6 +14,10 @@ pub struct DebugCameraText;
 pub struct DebugHoverText;
 #[derive(Component)]
 struct FpsCounterText;
+#[derive(Component)]
+struct WorldSeedText;
+#[derive(Component)]
+struct GraphicAdapterText;
 
 #[derive(Component)]
 pub struct ToolboxToggle {
@@ -35,15 +40,19 @@ impl Plugin for DebugUiPlugin {
                 Update,
                 update_fps_counter.run_if(in_state(GameState::InGame)),
             )
-            // Ajout du système qui gère les interactions sur les cases à cocher
             .add_systems(
                 Update,
-                toolbox_toggle_system.run_if(in_state(GameState::InGame))
+                toolbox_toggle_system.run_if(in_state(GameState::InGame)),
             );
     }
 }
 
-fn init_debug_bar(mut commands: Commands, ui_assets: Res<UiAssets>) {
+fn init_debug_bar(
+    mut commands: Commands,
+    ui_assets: Res<UiAssets>,
+    adapter: Res<RenderAdapterInfo>,
+    world_seed: Res<WorldSeed>,
+) {
     let root_entity = commands
         .spawn((
             Node {
@@ -77,7 +86,23 @@ fn init_debug_bar(mut commands: Commands, ui_assets: Res<UiAssets>) {
         });
 
         spawn_bar_column(child_spawner, |col_spawner| {
+            spawn_bar_text(
+                col_spawner,
+                &ui_assets,
+                &format!("Seed: {}", world_seed.0),
+                WorldSeedText,
+            );
+        });
+
+        let graphic_adapter_name = &adapter.name;
+        spawn_bar_column(child_spawner, |col_spawner| {
             spawn_bar_text(col_spawner, &ui_assets, "FPS: --", FpsCounterText);
+            spawn_bar_text(
+                col_spawner,
+                &ui_assets,
+                &format!("Adapter: {}", graphic_adapter_name),
+                GraphicAdapterText,
+            );
         });
     });
 }
@@ -85,16 +110,14 @@ fn init_debug_bar(mut commands: Commands, ui_assets: Res<UiAssets>) {
 // TODO: Voir pour utiliser bevy_mod_imgui lorsque le paquet sera compatible avec Bevy 0.16
 fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
     let toolbox_root = commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                top: Val::Px(16.0),
-                right: Val::Px(16.0),
-                width: Val::Px(255.0),
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
-        ))
+        .spawn((Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(16.0),
+            right: Val::Px(16.0),
+            width: Val::Px(255.0),
+            flex_direction: FlexDirection::Column,
+            ..default()
+        },))
         .id();
 
     let toolbox_title = (
@@ -131,33 +154,70 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
         BackgroundColor(Color::srgba(76.0 / 255.0, 76.0 / 255.0, 76.0 / 255.0, 0.9)),
     );
 
-    commands.entity(toolbox_root).with_children(|child_spawner| {
-        child_spawner.spawn(toolbox_title);
-        child_spawner
-            .spawn(toolbox_content)
-            .with_related::<ChildOf>(|content_spawner| {
-                // Multiple choices authorized
-                spawn_toolbox_section(content_spawner, &ui_assets, "Cell Mouse Selection", |section_spawner, ui_assets| {
-                    spawn_toolbox_property(section_spawner, ui_assets, "Solid Objects", true);
-                    spawn_toolbox_property(section_spawner, ui_assets, "Entities", false);
-                });
+    commands
+        .entity(toolbox_root)
+        .with_children(|child_spawner| {
+            child_spawner.spawn(toolbox_title);
+            child_spawner
+                .spawn(toolbox_content)
+                .with_related::<ChildOf>(|content_spawner| {
+                    // Multiple choices authorized
+                    spawn_toolbox_section(
+                        content_spawner,
+                        &ui_assets,
+                        "Cell Mouse Selection",
+                        |section_spawner, ui_assets| {
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Solid Objects",
+                                true,
+                            );
+                            spawn_toolbox_property(section_spawner, ui_assets, "Entities", false);
+                        },
+                    );
 
-                // No multiple choices authorized
-                spawn_toolbox_section(content_spawner, &ui_assets, "Click Action", |section_spawner, ui_assets| {
-                    spawn_toolbox_property(section_spawner, ui_assets, "Destroy", true);
-                    spawn_toolbox_property(section_spawner, ui_assets, "Place Solid Object", false);
-                    spawn_toolbox_property(section_spawner, ui_assets, "Place Entity", false);
-                });
+                    // No multiple choices authorized
+                    spawn_toolbox_section(
+                        content_spawner,
+                        &ui_assets,
+                        "Click Action",
+                        |section_spawner, ui_assets| {
+                            spawn_toolbox_property(section_spawner, ui_assets, "Destroy", true);
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Place Solid Object",
+                                false,
+                            );
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Place Entity",
+                                false,
+                            );
+                        },
+                    );
 
-                // No multiple choices authorized
-                spawn_toolbox_section(content_spawner, &ui_assets, "Solid Objects", |section_spawner, ui_assets| {
-                    spawn_toolbox_property(section_spawner, ui_assets, "Rock", true);
-                    spawn_toolbox_property(section_spawner, ui_assets, "Olivine", false);
-                    spawn_toolbox_property(section_spawner, ui_assets, "Basalt", false);
-                    spawn_toolbox_property(section_spawner, ui_assets, "Red Crystal", false);
+                    // No multiple choices authorized
+                    spawn_toolbox_section(
+                        content_spawner,
+                        &ui_assets,
+                        "Solid Objects",
+                        |section_spawner, ui_assets| {
+                            spawn_toolbox_property(section_spawner, ui_assets, "Rock", true);
+                            spawn_toolbox_property(section_spawner, ui_assets, "Olivine", false);
+                            spawn_toolbox_property(section_spawner, ui_assets, "Basalt", false);
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Red Crystal",
+                                false,
+                            );
+                        },
+                    );
                 });
-            });
-    });
+        });
 }
 
 fn spawn_bar_text<M: Component>(
@@ -183,13 +243,11 @@ fn spawn_bar_column(
     spawn_contents: impl FnOnce(&mut RelatedSpawnerCommands<ChildOf>),
 ) {
     spawner
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(4.0),
-                ..default()
-            },
-        ))
+        .spawn((Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(4.0),
+            ..default()
+        },))
         .with_related::<ChildOf>(|col_spawner| {
             spawn_contents(col_spawner);
         });
@@ -220,13 +278,11 @@ fn spawn_toolbox_section(
     build_section: impl FnOnce(&mut RelatedSpawnerCommands<ChildOf>, &UiAssets),
 ) {
     spawner
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(4.0),
-                ..default()
-            },
-        ))
+        .spawn((Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(4.0),
+            ..default()
+        },))
         .with_related::<ChildOf>(|section_spawner| {
             section_spawner.spawn((
                 Text::new(section_title),
@@ -239,13 +295,11 @@ fn spawn_toolbox_section(
             ));
 
             section_spawner
-                .spawn((
-                    Node {
-                        flex_direction: FlexDirection::Column,
-                        row_gap: Val::Px(4.0),
-                        ..default()
-                    },
-                ))
+                .spawn((Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(4.0),
+                    ..default()
+                },))
                 .with_related::<ChildOf>(|props_spawner| {
                     build_section(props_spawner, ui_assets);
                 });
@@ -271,13 +325,11 @@ fn spawn_toolbox_property(
     initial_state: bool,
 ) {
     spawner
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(4.0),
-                ..default()
-            },
-        ))
+        .spawn((Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(4.0),
+            ..default()
+        },))
         .with_related::<ChildOf>(|row_spawner| {
             let checkbox_color = if initial_state {
                 Color::srgba(0.0, 1.0, 0.0, 1.0)
@@ -293,7 +345,9 @@ fn spawn_toolbox_property(
                 },
                 Button,
                 BackgroundColor(checkbox_color),
-                ToolboxToggle { value: initial_state },
+                ToolboxToggle {
+                    value: initial_state,
+                },
             ));
 
             row_spawner.spawn((
@@ -312,7 +366,10 @@ fn spawn_toolbox_property(
 /// Pour chaque entité possédant ToolboxToggle, lorsque l'état Interaction change et qu'il est Pressed,
 /// on inverse la valeur et on met à jour la couleur de fond.
 fn toolbox_toggle_system(
-    mut query: Query<(&Interaction, &mut ToolboxToggle, &mut BackgroundColor), Changed<Interaction>>,
+    mut query: Query<
+        (&Interaction, &mut ToolboxToggle, &mut BackgroundColor),
+        Changed<Interaction>,
+    >,
 ) {
     for (interaction, mut toggle, mut bg_color) in query.iter_mut() {
         if *interaction == Interaction::Pressed {
