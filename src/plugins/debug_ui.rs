@@ -1,7 +1,7 @@
 use bevy::color::palettes::css::BLACK;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
-use bevy::ui::{FlexDirection, UiRect};
+use bevy::ui::{FlexDirection, Interaction, UiRect};
 
 use crate::components::UiAssets;
 use crate::GameState;
@@ -34,6 +34,11 @@ impl Plugin for DebugUiPlugin {
             .add_systems(
                 Update,
                 update_fps_counter.run_if(in_state(GameState::InGame)),
+            )
+            // Ajout du système qui gère les interactions sur les cases à cocher
+            .add_systems(
+                Update,
+                toolbox_toggle_system.run_if(in_state(GameState::InGame))
             );
     }
 }
@@ -55,7 +60,7 @@ fn init_debug_bar(mut commands: Commands, ui_assets: Res<UiAssets>) {
         ))
         .id();
 
-    commands.entity(root_entity).with_related::<ChildOf>(|child_spawner| {
+    commands.entity(root_entity).with_children(|child_spawner| {
         spawn_bar_column(child_spawner, |col_spawner| {
             spawn_bar_text(
                 col_spawner,
@@ -126,22 +131,25 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
         BackgroundColor(Color::srgba(76.0 / 255.0, 76.0 / 255.0, 76.0 / 255.0, 0.9)),
     );
 
-    commands.entity(toolbox_root).with_related::<ChildOf>(|child_spawner| {
+    commands.entity(toolbox_root).with_children(|child_spawner| {
         child_spawner.spawn(toolbox_title);
         child_spawner
             .spawn(toolbox_content)
             .with_related::<ChildOf>(|content_spawner| {
+                // Multiple choices authorized
                 spawn_toolbox_section(content_spawner, &ui_assets, "Cell Mouse Selection", |section_spawner, ui_assets| {
                     spawn_toolbox_property(section_spawner, ui_assets, "Solid Objects", true);
                     spawn_toolbox_property(section_spawner, ui_assets, "Entities", false);
                 });
 
+                // No multiple choices authorized
                 spawn_toolbox_section(content_spawner, &ui_assets, "Click Action", |section_spawner, ui_assets| {
                     spawn_toolbox_property(section_spawner, ui_assets, "Destroy", true);
                     spawn_toolbox_property(section_spawner, ui_assets, "Place Solid Object", false);
                     spawn_toolbox_property(section_spawner, ui_assets, "Place Entity", false);
                 });
 
+                // No multiple choices authorized
                 spawn_toolbox_section(content_spawner, &ui_assets, "Solid Objects", |section_spawner, ui_assets| {
                     spawn_toolbox_property(section_spawner, ui_assets, "Rock", true);
                     spawn_toolbox_property(section_spawner, ui_assets, "Olivine", false);
@@ -283,6 +291,7 @@ fn spawn_toolbox_property(
                     height: Val::Px(16.0),
                     ..default()
                 },
+                Button,
                 BackgroundColor(checkbox_color),
                 ToolboxToggle { value: initial_state },
             ));
@@ -297,6 +306,26 @@ fn spawn_toolbox_property(
                 TextColor(Color::WHITE),
             ));
         });
+}
+
+/// Système qui gère l'interaction sur les cases à cocher de la toolbox.
+/// Pour chaque entité possédant ToolboxToggle, lorsque l'état Interaction change et qu'il est Pressed,
+/// on inverse la valeur et on met à jour la couleur de fond.
+fn toolbox_toggle_system(
+    mut query: Query<(&Interaction, &mut ToolboxToggle, &mut BackgroundColor), Changed<Interaction>>,
+) {
+    for (interaction, mut toggle, mut bg_color) in query.iter_mut() {
+        if *interaction == Interaction::Pressed {
+            // Inverser la valeur
+            toggle.value = !toggle.value;
+            // Mettre à jour la couleur en fonction de la nouvelle valeur
+            if toggle.value {
+                *bg_color = BackgroundColor(Color::srgba(0.0, 1.0, 0.0, 1.0));
+            } else {
+                *bg_color = BackgroundColor(Color::srgba(1.0, 0.0, 0.0, 1.0));
+            }
+        }
+    }
 }
 
 pub fn update_debug_camera_text(
