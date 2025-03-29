@@ -315,7 +315,7 @@ dependencies = [
  "bevy_ecs",
  "bevy_log",
  "bevy_math",
-    "bevy_mesh",
+ "bevy_mesh",
  "bevy_platform_support",
  "bevy_reflect",
  "bevy_render",
