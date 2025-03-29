@@ -22,7 +22,11 @@ impl Plugin for DebugUiPlugin {
         app.add_systems(OnEnter(GameState::InGame), init)
             .add_systems(
                 FixedUpdate,
-                update_debug_camera_text.run_if(in_state(GameState::InGame)),
+                (update_debug_camera_text).run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(
+                Update,
+                (update_fps_counter).run_if(in_state(GameState::InGame)),
             );
     }
 }
@@ -110,4 +114,24 @@ pub fn update_debug_camera_text(
         "Mouse position: ({:.1}, {:.1})",
         cursor_position.x, cursor_position.y
     );
+}
+
+
+fn update_fps_counter(
+    text_query: Query<Entity, With<FpsCounterText>>,
+    time: Res<Time>,
+    mut writer: TextUiWriter,
+) {
+    let text_entity = text_query.single().unwrap();
+    let fps = 1.0 / time.delta_secs();
+    let color = if fps < 30.0 {
+        Color::srgb(1.0, 0.0, 0.0)
+    } else if fps < 40.0 {
+        Color::srgb(1.0, 0.5, 0.0)
+    } else {
+        Color::WHITE
+    };
+
+    *writer.text(text_entity, 0) = format!("FPS: {:.1}", fps);
+    *writer.color(text_entity, 0) = TextColor::from(color);
 }
