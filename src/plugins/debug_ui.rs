@@ -24,25 +24,48 @@ pub struct ToolboxToggle {
     pub value: bool,
 }
 
+#[derive(Resource, Default)]
+pub struct ToolboxState {
+    // Cell Mouse Selection
+    pub select_solid_objects: bool,
+    pub select_entities: bool,
+    pub select_empty_cells: bool,
+    pub select_all: bool,
+
+    // Click Action
+    pub action_destroy: bool,
+    pub action_place_solid: bool,
+    pub action_place_entity: bool,
+
+    // Solid Objects
+    pub solid_rock: bool,
+    pub solid_olivine: bool,
+    pub solid_basalt: bool,
+    pub solid_red_crystal: bool,
+}
+
 pub struct DebugUiPlugin;
 
 impl Plugin for DebugUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            OnEnter(GameState::InGame),
-            (init_debug_bar, init_debug_toolbox),
-        )
+        app.init_resource::<ToolboxState>()
+            .add_systems(
+                OnEnter(GameState::InGame),
+                (init_debug_bar, init_debug_toolbox),
+            )
             .add_systems(
                 FixedUpdate,
                 update_debug_camera_text.run_if(in_state(GameState::InGame)),
             )
             .add_systems(
                 Update,
-                update_fps_counter.run_if(in_state(GameState::InGame)),
-            )
-            .add_systems(
-                Update,
-                toolbox_toggle_system.run_if(in_state(GameState::InGame)),
+                (
+                    update_fps_counter,
+                    toolbox_toggle_system,
+                    update_toolbox_state,
+                )
+                    .chain()
+                    .run_if(in_state(GameState::InGame)),
             );
     }
 }
@@ -167,13 +190,10 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
                         &ui_assets,
                         "Cell Mouse Selection",
                         |section_spawner, ui_assets| {
-                            spawn_toolbox_property(
-                                section_spawner,
-                                ui_assets,
-                                "Solid Objects",
-                                true,
-                            );
+                            spawn_toolbox_property(section_spawner, ui_assets, "All", false);
+                            spawn_toolbox_property(section_spawner, ui_assets, "Solid Objects", true);
                             spawn_toolbox_property(section_spawner, ui_assets, "Entities", false);
+                            spawn_toolbox_property(section_spawner, ui_assets, "Empty Cells", false);
                         },
                     );
 
@@ -218,6 +238,95 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
                     );
                 });
         });
+}
+
+fn update_toolbox_state(
+    mut state: ResMut<ToolboxState>,
+    query: Query<(&ToolboxToggle, &ChildOf, &Children)>,
+    text_query: Query<&Text>,
+) {
+    // Reset all state values
+    *state = ToolboxState::default();
+
+    // Update state based on toggle values
+    for (toggle, _parent, children) in query.iter() {
+        if !toggle.value {
+            continue;
+        }
+
+        // Find the text component to identify which toggle this is
+        for child in children.iter() {
+            if let Ok(text) = text_query.get(child) {
+                let label = text.0.as_str();
+
+                // Cell Mouse Selection section
+                match label {
+                    "All" => state.select_all = true,
+                    "Solid Objects" => state.select_solid_objects = true,
+                    "Entities" => state.select_entities = true,
+                    "Empty Cells" => state.select_empty_cells = true,
+
+                    // Click Action section
+                    "Destroy" => state.action_destroy = true,
+                    "Place Solid Object" => state.action_place_solid = true,
+                    "Place Entity" => state.action_place_entity = true,
+
+                    // Solid Objects section
+                    "Rock" => state.solid_rock = true,
+                    "Olivine" => state.solid_olivine = true,
+                    "Basalt" => state.solid_basalt = true,
+                    "Red Crystal" => state.solid_red_crystal = true,
+                    _ => {}
+                }
+                break;
+            }
+        }
+    }
+
+    // Enforce mutual exclusivity in Cell Mouse Selection
+    if state.select_all {
+        state.select_solid_objects = false;
+        state.select_entities = false;
+        state.select_empty_cells = false;
+    } else if state.select_solid_objects {
+        state.select_entities = false;
+        state.select_empty_cells = false;
+    } else if state.select_entities {
+        state.select_empty_cells = false;
+    }
+
+    // Enforce mutual exclusivity in Click Action
+    if state.action_destroy {
+        state.action_place_solid = false;
+        state.action_place_entity = false;
+    } else if state.action_place_solid {
+        state.action_place_entity = false;
+    }
+
+    // Enforce mutual exclusivity in Solid Objects
+    if state.solid_rock {
+        state.solid_olivine = false;
+        state.solid_basalt = false;
+        state.solid_red_crystal = false;
+    } else if state.solid_olivine {
+        state.solid_basalt = false;
+        state.solid_red_crystal = false;
+    } else if state.solid_basalt {
+        state.solid_red_crystal = false;
+    }
+
+    // Ensure defaults if nothing is selected
+    if !state.select_all && !state.select_solid_objects && !state.select_entities && !state.select_empty_cells {
+        state.select_solid_objects = true;
+    }
+
+    if !state.action_destroy && !state.action_place_solid && !state.action_place_entity {
+        state.action_destroy = true;
+    }
+
+    if !state.solid_rock && !state.solid_olivine && !state.solid_basalt && !state.solid_red_crystal {
+        state.solid_rock = true;
+    }
 }
 
 fn spawn_bar_text<M: Component>(
