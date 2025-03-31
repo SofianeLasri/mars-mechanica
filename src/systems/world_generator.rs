@@ -75,7 +75,7 @@ fn generate_chunk(
             let (coord_x, coord_y) = calc_cell_coordinates(&world_x, &world_y);
 
             // Generate ground cell
-            commands.spawn((
+            let mut terrain_cell = commands.spawn((
                 Sprite::from_color(MARS_GROUND_COLOR, VEC2_CELL_SIZE),
                 Transform::from_xyz(coord_x as f32, coord_y as f32, 0.0),
                 TerrainCell,
@@ -108,20 +108,22 @@ fn generate_chunk(
 
             let material_def = world_materials.materials.get(&material_id).unwrap();
 
-            let entity = commands.spawn((
-                Sprite::from_color(material_def.color, VEC2_CELL_SIZE),
-                Transform::from_xyz(coord_x as f32, coord_y as f32, 1.0),
-                SolidObject {
-                    material_id: material_id.clone(),
-                    health: material_def.strength,
-                    mergeable: material_def.can_be_merged,
-                    neighbors_pattern: 0,
-                },
-                TerrainChunk { chunk_x, chunk_y },
-            )).id();
+            terrain_cell.with_children(|cell| {
+                cell.spawn((
+                    Sprite::from_color(material_def.color, VEC2_CELL_SIZE),
+                    //Transform::from_xyz(coord_x as f32, coord_y as f32, 1.0),
+                    SolidObject {
+                        material_id: material_id.clone(),
+                        health: material_def.strength,
+                        mergeable: material_def.can_be_merged,
+                        neighbors_pattern: 0,
+                    },
+                    TerrainChunk { chunk_x, chunk_y },
+                ));
+            });
 
             if let Some(chunk_entities) = chunk_map.chunks.get_mut(&(chunk_x, chunk_y)) {
-                chunk_entities.insert(entity);
+                chunk_entities.insert(terrain_cell.id());
             }
         }
     }

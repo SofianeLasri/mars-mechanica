@@ -1,4 +1,4 @@
-use crate::components::{ChunkMap, ChunkUtils, ControlledCamera, EntitiesToDespawn, EntityDefinition, ItemText, MaskOverlay, MaterialDefinition, SolidObject, TerrainAssets, UpdateTerrainEvent, WorldEntities, WorldEntityItem, WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE};
+use crate::components::{ChunkMap, ChunkUtils, ControlledCamera, EntitiesToDespawn, EntityDefinition, ItemText, MaskOverlay, MaterialDefinition, SolidObject, TerrainAssets, TerrainCell, UpdateTerrainEvent, WorldEntities, WorldEntityItem, WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE};
 use crate::GameState;
 use bevy::prelude::*;
 use bevy::text::{JustifyText, TextColor, TextFont, TextLayout};
@@ -245,6 +245,7 @@ fn update_solid_objects(
 
 /// This method updates the neighbors pattern for all solid objects
 fn update_neighbors_pattern(
+    terrain_cells_query: Query<(Entity, &Transform, &TerrainCell, &Children)>,
     mut solid_objects_query: Query<(Entity, &mut SolidObject, &Transform)>,
     mut event_reader: EventReader<UpdateTerrainEvent>,
     chunk_map: Res<ChunkMap>,
@@ -265,34 +266,41 @@ fn update_neighbors_pattern(
         }
     }
 
-    let positions: Vec<(i32, i32, Entity, String)> = solid_objects_query
+    let positions: Vec<(i32, i32, Entity, String)> = terrain_cells_query
         .iter()
-        .filter(|(entity, _, _)| chunks_to_update.is_empty() || entities_to_update.contains(entity))
-        .map(|(entity, solid_object, transform)| {
+        .filter(|(entity, _, _, _)| chunks_to_update.is_empty() || entities_to_update.contains(entity))
+        .filter_map(|(_, transform, _, children)| {
+            let child = children.iter().next()?;
+            let solid_object = solid_objects_query.get(child).ok()?;
+
             let x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
             let y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
-            (x, y, entity, solid_object.material_id.clone())
+
+            Some((x, y, child, solid_object.1.material_id.clone()))
         })
         .collect();
 
-    for (entity, mut solid_object, transform) in solid_objects_query.iter_mut() {
-        if !solid_object.mergeable {
-            continue;
-        }
 
-        let x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
-        let y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
+    for (_parent_entity, parent_transform, _, children) in terrain_cells_query.iter() {
+        let x = (parent_transform.translation.x / CELL_SIZE as f32).round() as i32;
+        let y = (parent_transform.translation.y / CELL_SIZE as f32).round() as i32;
         let (chunk_x, chunk_y) = ChunkUtils::world_to_chunk_coords(x, y);
 
         if !chunks_to_update.is_empty() && !chunks_to_update.contains(&(chunk_x, chunk_y)) {
             continue;
         }
 
-        let material_id = &solid_object.material_id;
+        for child in children.iter() {
+            if let Ok((entity, mut solid_object, _)) = solid_objects_query.get_mut(child) {
+                if !solid_object.mergeable {
+                    continue;
+                }
 
-        let pattern = get_neighbors_pattern(&positions, entity, x, y, material_id);
-
-        solid_object.neighbors_pattern = pattern;
+                let material_id = &solid_object.material_id;
+                let pattern = get_neighbors_pattern(&positions, entity, x, y, material_id);
+                solid_object.neighbors_pattern = pattern;
+            }
+        }
     }
     info!("Neighbors pattern updated");
 }

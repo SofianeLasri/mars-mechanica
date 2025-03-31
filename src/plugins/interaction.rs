@@ -1,7 +1,4 @@
-use crate::components::{
-    ChunkUtils, HoverState, SolidObject, TerrainChunk, UpdateTerrainEvent, CELL_SIZE,
-    VEC2_CELL_SIZE,
-};
+use crate::components::{ChunkUtils, HoverState, SolidObject, TerrainCell, TerrainChunk, UpdateTerrainEvent, CELL_SIZE, VEC2_CELL_SIZE};
 use crate::plugins::camera::get_cursor_world_position;
 use crate::plugins::debug_ui::DebugHoverText;
 use crate::GameState;
@@ -39,16 +36,8 @@ pub fn hover_detection(
     mut commands: Commands,
     window_query: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform, &Projection)>,
-    mut solid_objects_query: Query<
-        (
-            Entity,
-            &Transform,
-            Option<&HoverState>,
-            &SolidObject,
-            &TerrainChunk,
-        ),
-        With<SolidObject>,
-    >,
+    terrain_cells_query: Query<(Entity, &Transform, &TerrainCell, &Children, &TerrainChunk)>,
+    mut solid_objects_query: Query<(Entity, Option<&HoverState>, &SolidObject), With<SolidObject>>,
     mut interaction_sprite_query: Query<Entity, With<InteractionSprite>>,
     mut text_query: Query<Entity, With<DebugHoverText>>,
     mut writer: TextUiWriter,
@@ -65,20 +54,19 @@ pub fn hover_detection(
     let cursor_y = (cursor_world_position.y / CELL_SIZE as f32).round() as i32;
     let (cursor_chunk_x, cursor_chunk_y) = ChunkUtils::world_to_chunk_coords(cursor_x, cursor_y);
 
-    for (entity, transform, hover_state, _solid_object, chunk) in solid_objects_query.iter_mut() {
-        // Ne vérifier que les blocs dans le chunk actuel
+    for (_parent_entity, parent_transform, _, children, chunk) in terrain_cells_query.iter() {
         if chunk.chunk_x != cursor_chunk_x || chunk.chunk_y != cursor_chunk_y {
             continue;
         }
 
         let block_size = VEC2_CELL_SIZE;
         let block_min = Vec2::new(
-            transform.translation.x - block_size.x / 2.0,
-            transform.translation.y - block_size.y / 2.0,
+            parent_transform.translation.x - block_size.x / 2.0,
+            parent_transform.translation.y - block_size.y / 2.0,
         );
         let block_max = Vec2::new(
-            transform.translation.x + block_size.x / 2.0,
-            transform.translation.y + block_size.y / 2.0,
+            parent_transform.translation.x + block_size.x / 2.0,
+            parent_transform.translation.y + block_size.y / 2.0,
         );
 
         let block_is_hovered_by_cursor = cursor_world_position.x >= block_min.x
@@ -87,16 +75,21 @@ pub fn hover_detection(
             && cursor_world_position.y <= block_max.y;
 
         if block_is_hovered_by_cursor {
-            a_block_has_been_hovered = true;
-            block_hover_action(
-                &mut commands,
-                &mut text_query,
-                &mut writer,
-                interaction_sprite,
-                entity,
-                transform,
-                hover_state,
-            );
+            for child in children.iter() {
+                if let Ok((entity, hover_state, _)) = solid_objects_query.get(child) {
+                    a_block_has_been_hovered = true;
+                    block_hover_action(
+                        &mut commands,
+                        &mut text_query,
+                        &mut writer,
+                        interaction_sprite,
+                        entity,
+                        parent_transform,
+                        hover_state,
+                    );
+                    break; // Trouver un seul bloc suffit
+                }
+            }
         }
     }
 
@@ -119,7 +112,6 @@ fn block_hover_action(
     transform: &Transform,
     hover_state: Option<&HoverState>,
 ) {
-    // [Cette fonction reste inchangée]
     update_debug_text(text_query, writer, Some(transform));
 
     commands
@@ -130,7 +122,6 @@ fn block_hover_action(
             100.0, // Z-index plus élevé que les blocs
         ));
 
-    // Ajouter ou mettre à jour le composant HoverState
     if hover_state.is_none() || !hover_state.unwrap().hovered {
         commands.entity(entity).insert(HoverState { hovered: true });
     }
@@ -158,18 +149,9 @@ fn update_debug_text(
 
 fn reset_solid_objects_hover_state(
     commands: &mut Commands,
-    solid_objects_query: &mut Query<
-        (
-            Entity,
-            &Transform,
-            Option<&HoverState>,
-            &SolidObject,
-            &TerrainChunk,
-        ),
-        With<SolidObject>,
-    >,
+    solid_objects_query: &mut Query<(Entity, Option<&HoverState>, &SolidObject), With<SolidObject>>,
 ) {
-    for (entity, _, hover_state, _, _) in solid_objects_query.iter_mut() {
+    for (entity, hover_state, _) in solid_objects_query.iter_mut() {
         if hover_state.is_some() && hover_state.unwrap().hovered {
             commands.entity(entity).remove::<HoverState>();
         }
