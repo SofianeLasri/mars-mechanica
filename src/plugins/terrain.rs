@@ -1,4 +1,4 @@
-use crate::components::{ChunkMap, ChunkUtils, ControlledCamera, EntitiesToDespawn, EntityDefinition, ItemText, MaskOverlay, MaterialDefinition, SolidObject, TerrainAssets, TerrainCell, UpdateTerrainEvent, WorldEntities, WorldEntityItem, WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE};
+use crate::components::{ChunkMap, ChunkUtils, ControlledCamera, EntitiesToDespawn, EntityDefinition, ItemText, MaskOverlay, MaterialDefinition, SolidObject, TerrainAssets, TerrainCell, TerrainChunk, UpdateTerrainEvent, WorldEntities, WorldEntityItem, WorldMaterials, CELL_SIZE, CHUNK_SIZE, MASK_THICKNESS, NEIGHBOR_BOTTOM, NEIGHBOR_BOTTOM_LEFT, NEIGHBOR_BOTTOM_RIGHT, NEIGHBOR_LEFT, NEIGHBOR_RIGHT, NEIGHBOR_TOP, NEIGHBOR_TOP_LEFT, NEIGHBOR_TOP_RIGHT, VEC2_CELL_SIZE};
 use crate::GameState;
 use bevy::prelude::*;
 use bevy::text::{JustifyText, TextColor, TextFont, TextLayout};
@@ -164,16 +164,28 @@ pub fn load_material_sprites(
 /// Système pour mettre à jour les objets solides (détruire si health = 0)
 fn update_solid_objects(
     mut commands: Commands,
-    solid_objects: Query<(Entity, &SolidObject, &Transform)>,
+    terrain_cells_query: Query<(Entity, &Transform, &Children, &TerrainChunk)>,
+    solid_objects_query: Query<(Entity, &SolidObject)>,
     world_materials: Res<WorldMaterials>,
     world_entities: Res<WorldEntities>,
     mut chunk_map: ResMut<ChunkMap>,
     asset_server: Res<AssetServer>,
     mut to_despawn: ResMut<EntitiesToDespawn>,
 ) {
-    for (entity, solid_object, transform) in solid_objects.iter() {
-        if solid_object.health <= 0.0 {
-            // Logique pour faire apparaître des items lorsqu'un objet est détruit
+    let mut to_destroy: Vec<(Entity, Entity, &Transform, &TerrainChunk)> = Vec::new();
+
+    for (parent_entity, parent_transform, children, chunk) in terrain_cells_query.iter() {
+        for child in children.iter() {
+            if let Ok((child_entity, solid_object)) = solid_objects_query.get(child) {
+                if solid_object.health <= 0.0 {
+                    to_destroy.push((child_entity, parent_entity, parent_transform, chunk));
+                }
+            }
+        }
+    }
+
+    for (child_entity, parent_entity, parent_transform, chunk) in to_destroy {
+        if let Ok((_, solid_object)) = solid_objects_query.get(child_entity) {
             if let Some(material) = world_materials.materials.get(&solid_object.material_id) {
                 if let Some(entity_def) = world_entities.entities.get(&material.drop_entity_id) {
                     let drop_count = if material.drop_count_min == material.drop_count_max {
@@ -190,7 +202,7 @@ fn update_solid_objects(
                                 custom_size: Some(Vec2::splat(64.0)),
                                 ..Default::default()
                             },
-                            Transform::from_translation(transform.translation),
+                            Transform::from_translation(parent_transform.translation),
                             Visibility::Visible,
                             WorldEntityItem {
                                 entity_id: material.drop_entity_id.clone(),
@@ -199,9 +211,9 @@ fn update_solid_objects(
                         ));
 
                     let text_position = Vec3::new(
-                        transform.translation.x,
-                        transform.translation.y - (CELL_SIZE as f32 / 2.0) + 10.0,
-                        transform.translation.z + 1.0,
+                        parent_transform.translation.x,
+                        parent_transform.translation.y - (CELL_SIZE as f32 / 2.0) + 10.0,
+                        parent_transform.translation.z + 1.0,
                     );
 
                     let text = drop_count.to_string();
@@ -223,22 +235,19 @@ fn update_solid_objects(
                 }
             }
 
-            let x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
-            let y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
-            let (chunk_x, chunk_y) = ChunkUtils::world_to_chunk_coords(x, y);
+            info!("Planing despawn for solid object entity {:?}", child_entity);
+            to_despawn.0.push(child_entity);
 
-            info!("Destroying entity {:?} at ({}, {})", entity, x, y);
-            if let Some(entities) = chunk_map.chunks.get_mut(&(chunk_x, chunk_y)) {
-                entities.remove(&entity);
+            let (chunk_x, chunk_y) = (chunk.chunk_x, chunk.chunk_y);
+            if let Some(_entities) = chunk_map.chunks.get_mut(&(chunk_x, chunk_y)) {
+                // _entities.remove(&child_entity);
+
                 info!(
-                    "Entity {:?} removed from chunk {:?}",
-                    entity,
+                    "Entity {:?} processed in chunk {:?}",
+                    child_entity,
                     (chunk_x, chunk_y)
                 );
             }
-
-            info!("Planing despawn for entity {:?}", entity);
-            to_despawn.0.push(entity); // <-- Ajout à la liste
         }
     }
 }
@@ -507,7 +516,7 @@ fn spawn_border_masks(
     let has_top_right = (neighbors_pattern & NEIGHBOR_TOP_RIGHT) != 0;
     let has_bottom_left = (neighbors_pattern & NEIGHBOR_BOTTOM_LEFT) != 0;
     let has_bottom_right = (neighbors_pattern & NEIGHBOR_BOTTOM_RIGHT) != 0;
-    
+
     // --- Coins : si deux côtés adjacents sont présents, on ajoute un masque carré pour masquer le coin intérieur.
     // Par exemple, si il n'y a ni voisin en haut ni en gauche, on affiche un carré dans le coin supérieur gauche.
     if !has_top && !has_left && has_right && has_bottom && has_bottom_right {

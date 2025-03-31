@@ -1,6 +1,6 @@
 use crate::components::terrain::*;
 use crate::GameState;
-use bevy::prelude::{info, Commands, EventWriter, NextState, Query, Res, ResMut, TextUiWriter, Transform, With};
+use bevy::prelude::{info, Commands, EventWriter, NextState, Res, ResMut, TextUiWriter, Transform, With};
 use bevy_sprite::Sprite;
 use noise::{NoiseFn, Perlin};
 use rand::random;
