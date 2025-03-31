@@ -184,7 +184,7 @@ fn update_solid_objects(
         }
     }
 
-    for (child_entity, parent_entity, parent_transform, chunk) in to_destroy {
+    for (child_entity, _parent_entity, parent_transform, chunk) in to_destroy {
         if let Ok((_, solid_object)) = solid_objects_query.get(child_entity) {
             if let Some(material) = world_materials.materials.get(&solid_object.material_id) {
                 if let Some(entity_def) = world_entities.entities.get(&material.drop_entity_id) {
