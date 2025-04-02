@@ -4,8 +4,8 @@ use bevy::prelude::*;
 use bevy::render::renderer::RenderAdapterInfo;
 use bevy::ui::{FlexDirection, Interaction, UiRect};
 
-use crate::components::{UiAssets, WorldSeed};
 use crate::GameState;
+use crate::components::{UiAssets, WorldSeed};
 
 // Existing debug text marker components
 #[derive(Component)]
@@ -21,10 +21,11 @@ struct GraphicAdapterText;
 
 #[derive(Component)]
 pub struct ToolboxToggle {
+    pub name: String,
     pub value: bool,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Debug)]
 pub struct ToolboxState {
     // Cell Mouse Selection
     pub select_solid_objects: bool,
@@ -54,16 +55,16 @@ impl Plugin for DebugUiPlugin {
                 (init_debug_bar, init_debug_toolbox),
             )
             .add_systems(
+                Update,
+                update_fps_counter.run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(
                 FixedUpdate,
                 update_debug_camera_text.run_if(in_state(GameState::InGame)),
             )
             .add_systems(
-                Update,
-                (
-                    update_fps_counter,
-                    toolbox_toggle_system,
-                    update_toolbox_state,
-                )
+                FixedUpdate,
+                (toolbox_toggle_system, update_toolbox_state)
                     .chain()
                     .run_if(in_state(GameState::InGame)),
             );
@@ -190,10 +191,28 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
                         &ui_assets,
                         "Cell Mouse Selection",
                         |section_spawner, ui_assets| {
-                            spawn_toolbox_property(section_spawner, ui_assets, "All", false);
-                            spawn_toolbox_property(section_spawner, ui_assets, "Solid Objects", true);
-                            spawn_toolbox_property(section_spawner, ui_assets, "Entities", false);
-                            spawn_toolbox_property(section_spawner, ui_assets, "Empty Cells", false);
+                            spawn_toolbox_property(section_spawner, ui_assets, "All", "all", false);
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Solid Objects",
+                                "solid_objects",
+                                true,
+                            );
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Entities",
+                                "entities",
+                                false,
+                            );
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Empty Cells",
+                                "empty_cells",
+                                false,
+                            );
                         },
                     );
 
@@ -203,17 +222,25 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
                         &ui_assets,
                         "Click Action",
                         |section_spawner, ui_assets| {
-                            spawn_toolbox_property(section_spawner, ui_assets, "Destroy", true);
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Destroy",
+                                "detroy",
+                                true,
+                            );
                             spawn_toolbox_property(
                                 section_spawner,
                                 ui_assets,
                                 "Place Solid Object",
+                                "place_solid_objects",
                                 false,
                             );
                             spawn_toolbox_property(
                                 section_spawner,
                                 ui_assets,
                                 "Place Entity",
+                                "place_entity",
                                 false,
                             );
                         },
@@ -225,13 +252,32 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
                         &ui_assets,
                         "Solid Objects",
                         |section_spawner, ui_assets| {
-                            spawn_toolbox_property(section_spawner, ui_assets, "Rock", true);
-                            spawn_toolbox_property(section_spawner, ui_assets, "Olivine", false);
-                            spawn_toolbox_property(section_spawner, ui_assets, "Basalt", false);
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Rock",
+                                "rock",
+                                true,
+                            );
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Olivine",
+                                "olivine",
+                                false,
+                            );
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Basalt",
+                                "basalt",
+                                false,
+                            );
                             spawn_toolbox_property(
                                 section_spawner,
                                 ui_assets,
                                 "Red Crystal",
+                                "red_crystal",
                                 false,
                             );
                         },
@@ -240,50 +286,36 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
         });
 }
 
-fn update_toolbox_state(
-    mut state: ResMut<ToolboxState>,
-    query: Query<(&ToolboxToggle, &ChildOf, &Children)>,
-    text_query: Query<&Text>,
-) {
-    // Reset all state values
+fn update_toolbox_state(mut state: ResMut<ToolboxState>, query: Query<(&ToolboxToggle)>) {
     *state = ToolboxState::default();
 
-    // Update state based on toggle values
-    for (toggle, _parent, children) in query.iter() {
+    for (toggle) in query.iter() {
         if !toggle.value {
             continue;
         }
 
-        // Find the text component to identify which toggle this is
-        for child in children.iter() {
-            if let Ok(text) = text_query.get(child) {
-                let label = text.0.as_str();
+        let label = &toggle.name.as_str();
 
-                // Cell Mouse Selection section
-                match label {
-                    "All" => state.select_all = true,
-                    "Solid Objects" => state.select_solid_objects = true,
-                    "Entities" => state.select_entities = true,
-                    "Empty Cells" => state.select_empty_cells = true,
+        match *label {
+            "all" => state.select_all = true,
+            "solid_objects" => state.select_solid_objects = true,
+            "entities" => state.select_entities = true,
+            "empty_cells" => state.select_empty_cells = true,
 
-                    // Click Action section
-                    "Destroy" => state.action_destroy = true,
-                    "Place Solid Object" => state.action_place_solid = true,
-                    "Place Entity" => state.action_place_entity = true,
+            // Click Action section
+            "destroy" => state.action_destroy = true,
+            "place_solid_objects" => state.action_place_solid = true,
+            "place_entity" => state.action_place_entity = true,
 
-                    // Solid Objects section
-                    "Rock" => state.solid_rock = true,
-                    "Olivine" => state.solid_olivine = true,
-                    "Basalt" => state.solid_basalt = true,
-                    "Red Crystal" => state.solid_red_crystal = true,
-                    _ => {}
-                }
-                break;
-            }
+            // Solid Objects section
+            "rock" => state.solid_rock = true,
+            "olivine" => state.solid_olivine = true,
+            "basalt" => state.solid_basalt = true,
+            "red_crystal" => state.solid_red_crystal = true,
+            _ => {}
         }
     }
 
-    // Enforce mutual exclusivity in Cell Mouse Selection
     if state.select_all {
         state.select_solid_objects = false;
         state.select_entities = false;
@@ -295,7 +327,6 @@ fn update_toolbox_state(
         state.select_empty_cells = false;
     }
 
-    // Enforce mutual exclusivity in Click Action
     if state.action_destroy {
         state.action_place_solid = false;
         state.action_place_entity = false;
@@ -303,7 +334,6 @@ fn update_toolbox_state(
         state.action_place_entity = false;
     }
 
-    // Enforce mutual exclusivity in Solid Objects
     if state.solid_rock {
         state.solid_olivine = false;
         state.solid_basalt = false;
@@ -315,8 +345,11 @@ fn update_toolbox_state(
         state.solid_red_crystal = false;
     }
 
-    // Ensure defaults if nothing is selected
-    if !state.select_all && !state.select_solid_objects && !state.select_entities && !state.select_empty_cells {
+    if !state.select_all
+        && !state.select_solid_objects
+        && !state.select_entities
+        && !state.select_empty_cells
+    {
         state.select_solid_objects = true;
     }
 
@@ -324,7 +357,8 @@ fn update_toolbox_state(
         state.action_destroy = true;
     }
 
-    if !state.solid_rock && !state.solid_olivine && !state.solid_basalt && !state.solid_red_crystal {
+    if !state.solid_rock && !state.solid_olivine && !state.solid_basalt && !state.solid_red_crystal
+    {
         state.solid_rock = true;
     }
 }
@@ -421,16 +455,18 @@ fn spawn_toolbox_section(
 /// * `spawner` - The spawner to use for creating the UI elements.
 /// * `ui_assets` - The UI assets to use for the font.
 /// * `label_text` - The text to display next to the checkbox.
+/// * `name` - The name of the property (used for identification).
 /// * `initial_state` - The initial state of the checkbox (checked or unchecked).
 ///
 /// # Example:
 /// ```rust
-/// spawn_toolbox_property(spawner, &ui_assets, "Property Name", true);
+/// spawn_toolbox_property(spawner, &ui_assets, "Property Name", "property_name", true);
 /// ```
 fn spawn_toolbox_property(
     spawner: &mut RelatedSpawnerCommands<ChildOf>,
     ui_assets: &UiAssets,
     label_text: &str,
+    name: &str,
     initial_state: bool,
 ) {
     spawner
@@ -455,6 +491,7 @@ fn spawn_toolbox_property(
                 Button,
                 BackgroundColor(checkbox_color),
                 ToolboxToggle {
+                    name: name.to_string(),
                     value: initial_state,
                 },
             ));
