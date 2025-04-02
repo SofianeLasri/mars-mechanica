@@ -1,6 +1,6 @@
-use crate::components::{ChunkUtils, HoverState, SolidObject, TerrainCell, TerrainChunk, UpdateTerrainEvent, CELL_SIZE, VEC2_CELL_SIZE};
+use crate::components::{ChunkUtils, HoverState, SolidObject, TerrainCell, TerrainChunk, UpdateTerrainEvent, WorldMaterials, CELL_SIZE, VEC2_CELL_SIZE};
 use crate::plugins::camera::get_cursor_world_position;
-use crate::plugins::debug_ui::DebugHoverText;
+use crate::plugins::debug_ui::{DebugHoverText, ToolboxState};
 use crate::GameState;
 use bevy::input::mouse::MouseButtonInput;
 use bevy::input::ButtonState;
@@ -28,102 +28,223 @@ impl Plugin for InteractionPlugin {
 pub fn init(mut commands: Commands) {
     let semi_transparent_white = Color::srgba(1.0, 1.0, 1.0, 0.5);
     let sprite = Sprite::from_color(semi_transparent_white, VEC2_CELL_SIZE);
-    commands.spawn((sprite, InteractionSprite));
+    commands.spawn((sprite, InteractionSprite, Transform::from_xyz(0.0, 0.0, -100.0))); // Commencer hors vue
 }
 
-/// This system will detect when the cursor is hovering over a block and update the visual effect
+/// This system will detect when the cursor is hovering over a terrain cell and update the visual effect
 pub fn hover_detection(
     mut commands: Commands,
     window_query: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform, &Projection)>,
-    terrain_cells_query: Query<(Entity, &Transform, &TerrainCell, &Children, &TerrainChunk)>,
-    mut solid_objects_query: Query<(Entity, Option<&HoverState>, &SolidObject), With<SolidObject>>,
-    mut interaction_sprite_query: Query<Entity, With<InteractionSprite>>,
+    terrain_cells_query: Query<(Entity, &Transform, &TerrainCell, Option<&Children>, &TerrainChunk)>,
+    solid_objects_query: Query<(Entity, Option<&HoverState>, &SolidObject)>,
+    mut interaction_sprite_query: Query<(Entity, &mut Transform), (With<InteractionSprite>, Without<TerrainCell>)>,
     mut text_query: Query<Entity, With<DebugHoverText>>,
     mut writer: TextUiWriter,
+    toolbox_state: Res<ToolboxState>,
 ) {
-    let interaction_sprite = interaction_sprite_query.single_mut().unwrap();
+    let (interaction_sprite, mut interaction_transform) = interaction_sprite_query.single_mut().unwrap();
     let cursor_world_position = get_cursor_world_position(window_query, camera_query);
 
-    reset_solid_objects_hover_state(&mut commands, &mut solid_objects_query);
+    // Reset all hover states
+    reset_solid_objects_hover_state(&mut commands, &solid_objects_query);
 
-    let mut a_block_has_been_hovered = false;
+    let mut found_hovered_cell = false;
 
-    // Calculer les coordonnées du chunk où se trouve le curseur
+    // Calculate chunk coordinates
     let cursor_x = (cursor_world_position.x / CELL_SIZE as f32).round() as i32;
     let cursor_y = (cursor_world_position.y / CELL_SIZE as f32).round() as i32;
     let (cursor_chunk_x, cursor_chunk_y) = ChunkUtils::world_to_chunk_coords(cursor_x, cursor_y);
 
-    for (_parent_entity, parent_transform, _, children, chunk) in terrain_cells_query.iter() {
+    for (terrain_entity, transform, _, has_children, chunk) in terrain_cells_query.iter() {
         if chunk.chunk_x != cursor_chunk_x || chunk.chunk_y != cursor_chunk_y {
             continue;
         }
+        update_debug_text(&mut text_query, &mut writer, Some(transform));
 
         let block_size = VEC2_CELL_SIZE;
         let block_min = Vec2::new(
-            parent_transform.translation.x - block_size.x / 2.0,
-            parent_transform.translation.y - block_size.y / 2.0,
+            transform.translation.x - block_size.x / 2.0,
+            transform.translation.y - block_size.y / 2.0,
         );
         let block_max = Vec2::new(
-            parent_transform.translation.x + block_size.x / 2.0,
-            parent_transform.translation.y + block_size.y / 2.0,
+            transform.translation.x + block_size.x / 2.0,
+            transform.translation.y + block_size.y / 2.0,
         );
 
-        let block_is_hovered_by_cursor = cursor_world_position.x >= block_min.x
+        let block_is_hovered = cursor_world_position.x >= block_min.x
             && cursor_world_position.x <= block_max.x
             && cursor_world_position.y >= block_min.y
             && cursor_world_position.y <= block_max.y;
 
-        if block_is_hovered_by_cursor {
-            for child in children.iter() {
-                if let Ok((entity, hover_state, _)) = solid_objects_query.get(child) {
-                    a_block_has_been_hovered = true;
-                    block_hover_action(
-                        &mut commands,
-                        &mut text_query,
-                        &mut writer,
-                        interaction_sprite,
-                        entity,
-                        parent_transform,
-                        hover_state,
-                    );
-                    break; // Trouver un seul bloc suffit
+        if block_is_hovered {
+            let mut should_highlight = false;
+
+            // Check if cell has children
+            if let Some(children) = has_children {
+                // Check if cell has a solid object
+                let has_solid_object = children.iter().any(|child| solid_objects_query.get(child).is_ok());
+
+                // Apply toolbox filtering
+                should_highlight = toolbox_state.select_all ||
+                    (toolbox_state.select_solid_objects && has_solid_object) ||
+                    (toolbox_state.select_empty_cells && children.is_empty());
+            } else {
+                // No children, so it's empty
+                should_highlight = toolbox_state.select_all || toolbox_state.select_empty_cells;
+            }
+
+            if should_highlight {
+                found_hovered_cell = true;
+
+                // Update debug text
+                //update_debug_text(&mut text_query, &mut writer, Some(transform));
+
+                // Move interaction sprite to hover over the cell
+                interaction_transform.translation.x = transform.translation.x;
+                interaction_transform.translation.y = transform.translation.y;
+                interaction_transform.translation.z = 100.0; // Z-index higher than blocks
+
+                // Mark solid objects as hovered if they exist
+                if let Some(children) = has_children {
+                    for &child in children {
+                        if solid_objects_query.get(child).is_ok() {
+                            commands.entity(child).insert(HoverState { hovered: true });
+                        }
+                    }
                 }
+
+                break;
             }
         }
     }
 
-    if !a_block_has_been_hovered {
-        commands
-            .entity(interaction_sprite)
-            .insert(Transform::from_xyz(
-                0.0, 0.0, -100.0, // Z-index plus bas que les blocs
-            ));
+    if !found_hovered_cell {
+        // Hide interaction sprite if not hovering
+        interaction_transform.translation.z = -100.0;
         update_debug_text(&mut text_query, &mut writer, None);
     }
 }
 
-fn block_hover_action(
-    commands: &mut Commands,
-    text_query: &mut Query<Entity, With<DebugHoverText>>,
-    writer: &mut TextUiWriter,
-    interaction_sprite: Entity,
-    entity: Entity,
-    transform: &Transform,
-    hover_state: Option<&HoverState>,
+/// This system destroys or places blocks when the player clicks
+pub fn block_click_handler(
+    mut commands: Commands,
+    mut mouse_button_events: EventReader<MouseButtonInput>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    camera_query: Query<(&Camera, &GlobalTransform, &Projection)>,
+    terrain_cells_query: Query<(Entity, &Transform, &Children, &TerrainChunk), With<TerrainCell>>,
+    mut solid_objects_query: Query<(Entity, Option<&HoverState>, &mut SolidObject)>,
+    mut update_terrain_events: EventWriter<UpdateTerrainEvent>,
+    world_materials: Res<WorldMaterials>,
+    toolbox_state: Res<ToolboxState>,
 ) {
-    update_debug_text(text_query, writer, Some(transform));
+    for event in mouse_button_events.read() {
+        if event.button == MouseButton::Left && event.state == ButtonState::Pressed {
+            // First try to handle destroy action
+            if toolbox_state.action_destroy {
+                // Find and destroy any hovered solid object
+                for (entity, hover_state, mut solid_object) in solid_objects_query.iter_mut() {
+                    if let Some(hover) = hover_state {
+                        if hover.hovered {
+                            // Find the parent terrain cell to get its chunk
+                            for (_, _, children, chunk) in terrain_cells_query.iter() {
+                                if children.contains(&entity) {
+                                    /*commands.entity(entity).insert(SolidObject {
+                                        health: 0.0,
+                                        ..solid_object
+                                    });*/
+                                    solid_object.health = 0.0;
 
-    commands
-        .entity(interaction_sprite)
-        .insert(Transform::from_xyz(
-            transform.translation.x,
-            transform.translation.y,
-            100.0, // Z-index plus élevé que les blocs
-        ));
+                                    update_terrain_events.write(UpdateTerrainEvent {
+                                        region: None,
+                                        chunk_coords: Some((chunk.chunk_x, chunk.chunk_y)),
+                                    });
 
-    if hover_state.is_none() || !hover_state.unwrap().hovered {
-        commands.entity(entity).insert(HoverState { hovered: true });
+                                    return; // We've handled the click
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If we're placing and didn't destroy anything, find a hovered empty cell
+            if toolbox_state.action_place_solid {
+                let cursor_world_position = get_cursor_world_position(window_query, camera_query);
+                let cursor_x = (cursor_world_position.x / CELL_SIZE as f32).round() as i32;
+                let cursor_y = (cursor_world_position.y / CELL_SIZE as f32).round() as i32;
+                let (cursor_chunk_x, cursor_chunk_y) = ChunkUtils::world_to_chunk_coords(cursor_x, cursor_y);
+
+                for (terrain_entity, transform, children, chunk) in terrain_cells_query.iter() {
+                    if chunk.chunk_x != cursor_chunk_x || chunk.chunk_y != cursor_chunk_y {
+                        continue;
+                    }
+
+                    // Check if this cell is empty
+                    if !children.is_empty() {
+                        continue;
+                    }
+
+                    // Check if this cell is hovered by the cursor
+                    let block_size = VEC2_CELL_SIZE;
+                    let block_min = Vec2::new(
+                        transform.translation.x - block_size.x / 2.0,
+                        transform.translation.y - block_size.y / 2.0,
+                    );
+                    let block_max = Vec2::new(
+                        transform.translation.x + block_size.x / 2.0,
+                        transform.translation.y + block_size.y / 2.0,
+                    );
+
+                    let is_hovered = cursor_world_position.x >= block_min.x
+                        && cursor_world_position.x <= block_max.x
+                        && cursor_world_position.y >= block_min.y
+                        && cursor_world_position.y <= block_max.y;
+
+                    if is_hovered {
+                        // Determine which material to place based on toolbox state
+                        let material_id = if toolbox_state.solid_rock {
+                            "rock"
+                        } else if toolbox_state.solid_olivine {
+                            "olivine"
+                        } else if toolbox_state.solid_basalt {
+                            "basalt"
+                        } else if toolbox_state.solid_red_crystal {
+                            "red_crystal"
+                        } else {
+                            "rock" // Default
+                        }.to_string();
+
+                        // Get material definition
+                        if let Some(material_def) = world_materials.materials.get(&material_id) {
+                            // Place new solid object
+                            commands.entity(terrain_entity).with_children(|cell| {
+                                cell.spawn((
+                                    Sprite::from_color(material_def.color, VEC2_CELL_SIZE),
+                                    SolidObject {
+                                        material_id: material_id.clone(),
+                                        health: material_def.strength,
+                                        mergeable: material_def.can_be_merged,
+                                        neighbors_pattern: 0,
+                                    },
+                                    TerrainChunk {
+                                        chunk_x: chunk.chunk_x,
+                                        chunk_y: chunk.chunk_y
+                                    },
+                                ));
+                            });
+
+                            update_terrain_events.write(UpdateTerrainEvent {
+                                region: None,
+                                chunk_coords: Some((chunk.chunk_x, chunk.chunk_y)),
+                            });
+
+                            return; // We've handled the click
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -149,37 +270,11 @@ fn update_debug_text(
 
 fn reset_solid_objects_hover_state(
     commands: &mut Commands,
-    solid_objects_query: &mut Query<(Entity, Option<&HoverState>, &SolidObject), With<SolidObject>>,
+    solid_objects_query: &Query<(Entity, Option<&HoverState>, &SolidObject)>,
 ) {
-    for (entity, hover_state, _) in solid_objects_query.iter_mut() {
+    for (entity, hover_state, _) in solid_objects_query.iter() {
         if hover_state.is_some() && hover_state.unwrap().hovered {
             commands.entity(entity).remove::<HoverState>();
-        }
-    }
-}
-
-/// This system will destroy a block when the player clicks on it
-pub fn block_click_handler(
-    mut mouse_button_events: EventReader<MouseButtonInput>,
-    mut solid_objects_query: Query<(&mut SolidObject, Option<&HoverState>, &TerrainChunk)>,
-    mut update_terrain_events: EventWriter<UpdateTerrainEvent>,
-) {
-    for event in mouse_button_events.read() {
-        if event.button == MouseButton::Left && event.state == ButtonState::Pressed {
-            for (mut solid_object, hover_state, chunk) in solid_objects_query.iter_mut() {
-                if let Some(hover) = hover_state {
-                    if hover.hovered {
-                        solid_object.health = 0.0;
-
-                        update_terrain_events.write(UpdateTerrainEvent {
-                            region: None,
-                            chunk_coords: Some((chunk.chunk_x, chunk.chunk_y)),
-                        });
-
-                        break;
-                    }
-                }
-            }
         }
     }
 }

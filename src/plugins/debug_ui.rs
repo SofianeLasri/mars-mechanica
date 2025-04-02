@@ -286,10 +286,13 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
         });
 }
 
-fn update_toolbox_state(mut state: ResMut<ToolboxState>, query: Query<(&ToolboxToggle)>) {
+fn update_toolbox_state(
+    mut state: ResMut<ToolboxState>,
+    query: Query<&ToolboxToggle>,
+) {
     *state = ToolboxState::default();
 
-    for (toggle) in query.iter() {
+    for toggle in query.iter() {
         if !toggle.value {
             continue;
         }
