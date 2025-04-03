@@ -132,7 +132,7 @@ pub fn block_click_handler(
     mut mouse_button_events: EventReader<MouseButtonInput>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform, &Projection)>,
-    terrain_cells_query: Query<(Entity, &Transform, &Children, &TerrainChunk), With<TerrainCell>>,
+    terrain_cells_query: Query<(Entity, &Transform, Option<&Children>, &TerrainChunk), With<TerrainCell>>,
     mut solid_objects_query: Query<(Entity, Option<&HoverState>, &mut SolidObject)>,
     mut update_terrain_events: EventWriter<UpdateTerrainEvent>,
     world_materials: Res<WorldMaterials>,
@@ -148,7 +148,7 @@ pub fn block_click_handler(
                         if hover.hovered {
                             // Find the parent terrain cell to get its chunk
                             for (_, _, children, chunk) in terrain_cells_query.iter() {
-                                if children.contains(&entity) {
+                                if children.is_some() && children.unwrap().contains(&entity) {
                                     /*commands.entity(entity).insert(SolidObject {
                                         health: 0.0,
                                         ..solid_object
@@ -181,9 +181,24 @@ pub fn block_click_handler(
                     }
 
                     // Check if this cell is empty
-                    if !children.is_empty() {
-                        continue;
-                    }
+                    /*if !children.is_empty() {
+                        //info!("Cell is not empty");
+                        // We only want to check if the children is a solid object or WorldEntityItem
+                        // This code is pretty inefficient since we're checking all the map solid objects...
+                        let has_solid_object = children.iter().any(|child| {
+                            for (entity, _, _) in solid_objects_query.iter() {
+                                if children.contains(&entity) {
+                                    return true; // Found a solid object
+                                }
+                            }
+                            false // No solid object found
+                        });
+
+                        if has_solid_object {
+                            //info!("Cell has solid object");
+                            continue;
+                        }
+                    }*/
 
                     // Check if this cell is hovered by the cursor
                     let block_size = VEC2_CELL_SIZE;
@@ -202,6 +217,7 @@ pub fn block_click_handler(
                         && cursor_world_position.y <= block_max.y;
 
                     if is_hovered {
+                        info!("Placing solid object in cell at ({}, {})", chunk.chunk_x, chunk.chunk_y);
                         // Determine which material to place based on toolbox state
                         let material_id = if toolbox_state.solid_rock {
                             "rock"
