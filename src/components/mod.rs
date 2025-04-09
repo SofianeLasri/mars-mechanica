@@ -3,6 +3,7 @@ pub mod terrain;
 pub mod ui;
 pub mod splash;
 pub mod assets;
+pub mod entity;
 
 pub use assets::*;
 pub use camera::*;
