@@ -19,6 +19,10 @@ impl Plugin for RobotPlugin {
     }
 }
 
+/// Spawns an explorer robot at a random position on the terrain, near the center of the map and
+/// on an empty cell.
+///
+/// **Note:** We use the asset server and not the asset preloader for the simplicity.
 fn spawn_explorer_robot(
     mut commands: Commands,
     terrain_query: Query<(&Transform, &TerrainCell, Option<&Children>)>,
@@ -28,10 +32,11 @@ fn spawn_explorer_robot(
 
     let mut available_position = None;
 
+    // In fact, there is a strong chance that the 0,0 cell isn't empty, so we need to search
+    // around it. We will search in a spiral pattern, starting from the center of the map.
     'search: for radius in 0i32..20i32 {
         for dx in -radius..=radius {
             for dy in -radius..=radius {
-                // Vérifier uniquement les cellules sur le périmètre
                 if dx.abs() != radius && dy.abs() != radius {
                     continue;
                 }
@@ -39,7 +44,6 @@ fn spawn_explorer_robot(
                 let x = dx * CELL_SIZE;
                 let y = dy * CELL_SIZE;
 
-                // Vérifier si cette cellule est vide
                 let is_empty = terrain_query
                     .iter()
                     .filter(|(transform, _, _)| {
@@ -55,6 +59,11 @@ fn spawn_explorer_robot(
             }
         }
     }
+
+    // Normally, we should have found an empty cell. If not, we will spawn the robot at (0,0).
+    // But in that case, the game can't launch. So we will have to restart the game.
+
+    // TODO: Handle the case where no empty cell is found.
 
     let position = available_position.unwrap_or(Vec2::ZERO);
 
@@ -76,15 +85,18 @@ fn spawn_explorer_robot(
             previous_position: None,
             follow_direction: 1,
         },
-        Name::new("Explorer Robot"),
+        Name::new("Explorer Rover"),
     ));
 
     info!(
-        "Robot explorateur placé à la position: ({}, {})",
+        "Explorer rover placed at cell: ({}, {})",
         cell_x, cell_y
     );
 }
 
+/// Detects the environment around the robot and updates the world knowledge accordingly.
+///
+/// The robot detects the terrain cells and solid objects within a radius of 8 cells.
 fn detect_environment(
     robot_query: Query<(&Transform, &ExplorerRobot)>,
     terrain_query: Query<(&Transform, &TerrainCell, Option<&Children>)>,
@@ -146,6 +158,8 @@ fn detect_environment(
     }
 }
 
+/// Plans the movement of the robot based on the world knowledge. It is programmed to follow
+/// the walls and explore the environment.
 fn plan_robot_movement(
     mut robot_query: Query<(&Transform, &mut ExplorerRobot)>,
     world_knowledge: Res<WorldKnowledge>,
