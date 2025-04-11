@@ -42,12 +42,17 @@ fn preload_assets(
     mut ui_assets: ResMut<UiAssets>,
     mut terrain_assets: ResMut<TerrainAssets>,
     mut loading_state: ResMut<LoadingState>,
+    cli_args: Res<CliArgs>
 ) {
     let mut ui_images: Vec<Handle<Image>> = Vec::new();
-    for i in 1..=30 {
-        let path = format!("textures/animations/intro/{:04}.png", i);
-        ui_images.push(asset_server.load(path));
+    
+    if !cli_args.skip_splash {
+        for i in 1..=30 {
+            let path = format!("textures/animations/intro/{:04}.png", i);
+            ui_images.push(asset_server.load(path));
+        }
     }
+
     ui_images.push(asset_server.load("textures/ui/background.png"));
     ui_assets.images = ui_images;
 

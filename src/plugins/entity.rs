@@ -1,15 +1,14 @@
-use bevy::color::Color;
-use crate::GameState;
 use bevy::color::palettes::basic::PURPLE;
+use bevy::color::Color;
 use bevy::math::Vec3;
-use bevy::prelude::{in_state, App, AssetServer, Assets, Commands, IntoScheduleConfigs, Mesh, Mesh2d, OnEnter, Plugin, Rectangle, Res, ResMut, Transform, Vec2};
+use bevy::prelude::{App, AssetServer, Assets, Commands, Mesh, Mesh2d, Plugin, Rectangle, Res, ResMut, Transform, Vec2};
 use bevy_sprite::{ColorMaterial, MeshMaterial2d};
 
 pub struct EntityPlugin;
 
 impl Plugin for EntityPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::InGame), spawn_multiple_squares.run_if(in_state(GameState::InGame)));
+        //app.add_systems(OnEnter(GameState::InGame), spawn_multiple_squares.run_if(in_state(GameState::InGame)));
     }
 }
 
