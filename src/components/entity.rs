@@ -18,3 +18,6 @@ pub struct WorldKnowledge {
     pub discovered_empty: HashSet<IVec2>,
     pub exploration_queue: VecDeque<IVec2>,
 }
+
+#[derive(Component)]
+pub struct DebugRobotText;

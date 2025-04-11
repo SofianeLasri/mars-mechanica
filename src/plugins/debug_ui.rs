@@ -4,8 +4,9 @@ use bevy::prelude::*;
 use bevy::render::renderer::RenderAdapterInfo;
 use bevy::ui::{FlexDirection, Interaction, UiRect};
 
-use crate::GameState;
+use crate::components::entity::{DebugRobotText, ExplorerRobot, WorldKnowledge};
 use crate::components::{UiAssets, WorldSeed};
+use crate::GameState;
 
 // Existing debug text marker components
 #[derive(Component)]
@@ -67,6 +68,10 @@ impl Plugin for DebugUiPlugin {
                 (toolbox_toggle_system, update_toolbox_state)
                     .chain()
                     .run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(
+                FixedUpdate,
+                update_robot_debug_text.run_if(in_state(GameState::InGame)),
             );
     }
 }
@@ -115,6 +120,12 @@ fn init_debug_bar(
                 &ui_assets,
                 &format!("Seed: {}", world_seed.0),
                 WorldSeedText,
+            );
+            spawn_bar_text(
+                col_spawner,
+                &ui_assets,
+                "Robot: No data",
+                DebugRobotText,
             );
         });
 
@@ -572,4 +583,32 @@ fn update_fps_counter(
 
     *writer.text(text_entity, 0) = format!("FPS: {:.1}", fps);
     *writer.color(text_entity, 0) = TextColor::from(color);
+}
+
+pub fn update_robot_debug_text(
+    text_query: Query<Entity, With<DebugRobotText>>,
+    world_knowledge: Res<WorldKnowledge>,
+    robot_query: Query<&ExplorerRobot>,
+    mut writer: TextUiWriter,
+) {
+    if let Ok(text_entity) = text_query.single() {
+        if let Ok(robot) = robot_query.single() {
+            let discovered_cells = world_knowledge.discovered_cells.len();
+            let discovered_solids = world_knowledge.discovered_solids.len();
+            let discovered_empty = world_knowledge.discovered_empty.len();
+
+            let text = format!(
+                "Robot: Pos({},{}), Cells: {}, Solids: {}, Empty: {}",
+                robot.target_position.x,
+                robot.target_position.y,
+                discovered_cells,
+                discovered_solids,
+                discovered_empty
+            );
+
+            *writer.text(text_entity, 0) = text;
+        } else {
+            *writer.text(text_entity, 0) = "Robot: Not spawned".to_string();
+        }
+    }
 }
