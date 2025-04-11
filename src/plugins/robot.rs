@@ -1,6 +1,6 @@
-use crate::GameState;
 use crate::components::entity::{ExplorerRobot, WorldKnowledge};
-use crate::components::terrain::{CELL_SIZE, SolidObject, TerrainCell, VEC2_CELL_SIZE};
+use crate::components::terrain::{SolidObject, TerrainCell, CELL_SIZE, VEC2_CELL_SIZE};
+use crate::GameState;
 use bevy::prelude::*;
 use rand::prelude::*;
 
@@ -69,10 +69,12 @@ fn spawn_explorer_robot(
         },
         Transform::from_xyz(position.x, position.y, 10.0),
         ExplorerRobot {
-            speed: 1.0, // Une cellule par seconde
+            speed: 1.0,
             target_position: IVec2::new(cell_x, cell_y),
             is_moving: false,
             move_timer: 0.0,
+            previous_position: None,
+            follow_direction: 1,
         },
         Name::new("Explorer Robot"),
     ));
@@ -163,6 +165,10 @@ fn plan_robot_movement(
         let current_cell_y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
         let current_cell = IVec2::new(current_cell_x, current_cell_y);
 
+        if robot.previous_position.is_none() {
+            robot.previous_position = Some(current_cell);
+        }
+
         let directions = [
             IVec2::new(1, 0),  // droite
             IVec2::new(0, 1),  // haut
@@ -171,38 +177,109 @@ fn plan_robot_movement(
         ];
 
         let mut accessible_cells = Vec::new();
-
         for dir in directions.iter() {
             let neighbor = current_cell + *dir;
-
-            if world_knowledge.discovered_empty.contains(&neighbor) {
+            if world_knowledge.discovered_empty.contains(&neighbor)
+                && Some(neighbor) != robot.previous_position
+            {
                 accessible_cells.push(neighbor);
             }
         }
 
-        let mut unexplored_neighbors = Vec::new();
-
-        for &cell in &accessible_cells {
+        if accessible_cells.is_empty() {
             for dir in directions.iter() {
-                let neighbor = cell + *dir;
-
-                if !world_knowledge.discovered_cells.contains(&neighbor) {
-                    unexplored_neighbors.push(cell);
-                    break;
+                let neighbor = current_cell + *dir;
+                if world_knowledge.discovered_empty.contains(&neighbor) {
+                    accessible_cells.push(neighbor);
                 }
             }
         }
 
-        let mut rng = rand::rng();
-        let next_cell = if !unexplored_neighbors.is_empty() {
-            unexplored_neighbors.choose(&mut rng).copied().unwrap()
-        } else if !accessible_cells.is_empty() {
-            accessible_cells.choose(&mut rng).copied().unwrap()
+        if accessible_cells.is_empty() {
+            continue;
+        }
+
+        let mut solid_neighbors = Vec::new();
+        for dir in &directions {
+            let check_cell = current_cell + *dir;
+            if world_knowledge.discovered_solids.contains_key(&check_cell) {
+                solid_neighbors.push(*dir);
+            }
+        }
+
+        let mut next_cell = current_cell;
+
+        if !solid_neighbors.is_empty() {
+            solid_neighbors.sort_by_key(|dir| (dir.x.abs() + dir.y.abs()) * 10 + dir.y * 2 + dir.x);
+
+            let solid_dir = solid_neighbors[0];
+
+            let preferred_dir = if robot.follow_direction > 0 {
+                IVec2::new(-solid_dir.y, solid_dir.x) // Rotation 90° horaire
+            } else {
+                IVec2::new(solid_dir.y, -solid_dir.x) // Rotation 90° anti-horaire
+            };
+
+            let preferred_cell = current_cell + preferred_dir;
+
+            if world_knowledge.discovered_empty.contains(&preferred_cell)
+                && Some(preferred_cell) != robot.previous_position
+            {
+                next_cell = preferred_cell;
+            } else {
+                let alt_dir = if robot.follow_direction > 0 {
+                    IVec2::new(solid_dir.y, -solid_dir.x)
+                } else {
+                    IVec2::new(-solid_dir.y, solid_dir.x)
+                };
+
+                let alt_cell = current_cell + alt_dir;
+
+                if world_knowledge.discovered_empty.contains(&alt_cell)
+                    && Some(alt_cell) != robot.previous_position
+                {
+                    next_cell = alt_cell;
+                    robot.follow_direction = -robot.follow_direction;
+                } else if !accessible_cells.is_empty() {
+                    next_cell = accessible_cells[0];
+                }
+            }
         } else {
-            current_cell
-        };
+            let cells_next_to_solid: Vec<IVec2> = accessible_cells
+                .iter()
+                .filter(|&&cell| {
+                    directions.iter().any(|dir| {
+                        let adj_cell = cell + *dir;
+                        world_knowledge.discovered_solids.contains_key(&adj_cell)
+                    })
+                })
+                .copied()
+                .collect();
+
+            if !cells_next_to_solid.is_empty() {
+                next_cell = cells_next_to_solid[0];
+            } else {
+                let unexplored_cells: Vec<IVec2> = accessible_cells
+                    .iter()
+                    .filter(|&&cell| {
+                        directions.iter().any(|dir| {
+                            let neighbor = cell + *dir;
+                            !world_knowledge.discovered_cells.contains(&neighbor)
+                        })
+                    })
+                    .copied()
+                    .collect();
+
+                if !unexplored_cells.is_empty() {
+                    next_cell = unexplored_cells[0];
+                } else {
+                    next_cell = accessible_cells[0];
+                }
+            }
+        }
 
         if next_cell != current_cell {
+            robot.previous_position = Some(current_cell);
             robot.target_position = next_cell;
             robot.is_moving = true;
             robot.move_timer = 0.0;
