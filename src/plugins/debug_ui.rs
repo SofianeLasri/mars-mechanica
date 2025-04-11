@@ -3,9 +3,10 @@ use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
 use bevy::render::renderer::RenderAdapterInfo;
 use bevy::ui::{FlexDirection, Interaction, UiRect};
+use std::collections::HashSet;
 
 use crate::components::entity::{DebugRobotText, ExplorerRobot, WorldKnowledge};
-use crate::components::{UiAssets, WorldSeed};
+use crate::components::{UiAssets, WorldSeed, CELL_SIZE, VEC2_CELL_SIZE};
 use crate::GameState;
 
 // Existing debug text marker components
@@ -44,7 +45,13 @@ pub struct ToolboxState {
     pub solid_olivine: bool,
     pub solid_basalt: bool,
     pub solid_red_crystal: bool,
+
+    // Debug Visualization
+    pub show_discovered_cells: bool,
 }
+
+#[derive(Component)]
+pub struct DiscoveredCellVisualizer;
 
 pub struct DebugUiPlugin;
 
@@ -61,17 +68,19 @@ impl Plugin for DebugUiPlugin {
             )
             .add_systems(
                 FixedUpdate,
-                update_debug_camera_text.run_if(in_state(GameState::InGame)),
+                (
+                    update_debug_camera_text,
+                    update_robot_debug_text,
+                    update_discovered_cells_visualization,
+                    update_new_discovered_cells,
+                )
+                    .run_if(in_state(GameState::InGame)),
             )
             .add_systems(
                 FixedUpdate,
                 (toolbox_toggle_system, update_toolbox_state)
                     .chain()
                     .run_if(in_state(GameState::InGame)),
-            )
-            .add_systems(
-                FixedUpdate,
-                update_robot_debug_text.run_if(in_state(GameState::InGame)),
             );
     }
 }
@@ -121,12 +130,7 @@ fn init_debug_bar(
                 &format!("Seed: {}", world_seed.0),
                 WorldSeedText,
             );
-            spawn_bar_text(
-                col_spawner,
-                &ui_assets,
-                "Robot: No data",
-                DebugRobotText,
-            );
+            spawn_bar_text(col_spawner, &ui_assets, "Robot: No data", DebugRobotText);
         });
 
         let graphic_adapter_name = &adapter.name;
@@ -293,14 +297,26 @@ fn init_debug_toolbox(mut commands: Commands, ui_assets: Res<UiAssets>) {
                             );
                         },
                     );
+
+                    spawn_toolbox_section(
+                        content_spawner,
+                        &ui_assets,
+                        "Debug Visualization",
+                        |section_spawner, ui_assets| {
+                            spawn_toolbox_property(
+                                section_spawner,
+                                ui_assets,
+                                "Show Discovered Cells",
+                                "show_discovered_cells",
+                                false,
+                            );
+                        },
+                    );
                 });
         });
 }
 
-fn update_toolbox_state(
-    mut state: ResMut<ToolboxState>,
-    query: Query<&ToolboxToggle>,
-) {
+fn update_toolbox_state(mut state: ResMut<ToolboxState>, query: Query<&ToolboxToggle>) {
     *state = ToolboxState::default();
 
     for toggle in query.iter() {
@@ -310,6 +326,7 @@ fn update_toolbox_state(
 
         let label = &toggle.name.as_str();
 
+        // Exclusive choices
         match *label {
             "all" => state.select_all = true,
             "solid_objects" => state.select_solid_objects = true,
@@ -327,6 +344,11 @@ fn update_toolbox_state(
             "basalt" => state.solid_basalt = true,
             "red_crystal" => state.solid_red_crystal = true,
             _ => {}
+        }
+
+        // Non-exclusive choices
+        if toggle.value && toggle.name == "show_discovered_cells" {
+            state.show_discovered_cells = true;
         }
     }
 
@@ -609,6 +631,72 @@ pub fn update_robot_debug_text(
             *writer.text(text_entity, 0) = text;
         } else {
             *writer.text(text_entity, 0) = "Robot: Not spawned".to_string();
+        }
+    }
+}
+
+fn update_discovered_cells_visualization(
+    mut commands: Commands,
+    world_knowledge: Res<WorldKnowledge>,
+    toolbox_state: Res<ToolboxState>,
+    visualizer_query: Query<Entity, With<DiscoveredCellVisualizer>>,
+) {
+    if !toolbox_state.show_discovered_cells {
+        for entity in visualizer_query.iter() {
+            commands.entity(entity).despawn();
+        }
+        return;
+    }
+
+    if !visualizer_query.is_empty() {
+        return;
+    }
+
+    let discovered_color = Color::srgba(0.0, 1.0, 0.2, 0.2); // Vert transparent à 20%
+
+    for cell_pos in &world_knowledge.discovered_cells {
+        let world_x = cell_pos.x * CELL_SIZE;
+        let world_y = cell_pos.y * CELL_SIZE;
+
+        commands.spawn((
+            Sprite::from_color(discovered_color, VEC2_CELL_SIZE),
+            Transform::from_xyz(world_x as f32, world_y as f32, 5.0), // Z=5 pour être au-dessus du terrain mais sous les entités
+            DiscoveredCellVisualizer,
+        ));
+    }
+}
+
+fn update_new_discovered_cells(
+    mut commands: Commands,
+    world_knowledge: Res<WorldKnowledge>,
+    toolbox_state: Res<ToolboxState>,
+    visualizer_query: Query<(Entity, &Transform), With<DiscoveredCellVisualizer>>,
+) {
+    if !toolbox_state.show_discovered_cells {
+        return;
+    }
+
+    // Collecter les positions des visualiseurs existants
+    let mut existing_positions = HashSet::new();
+    for (_, transform) in visualizer_query.iter() {
+        let cell_x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
+        let cell_y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
+        existing_positions.insert(IVec2::new(cell_x, cell_y));
+    }
+
+    // Créer des visualisations uniquement pour les nouvelles cellules
+    let discovered_color = Color::srgba(0.0, 1.0, 0.2, 0.2);
+
+    for cell_pos in &world_knowledge.discovered_cells {
+        if !existing_positions.contains(cell_pos) {
+            let world_x = cell_pos.x * CELL_SIZE;
+            let world_y = cell_pos.y * CELL_SIZE;
+
+            commands.spawn((
+                Sprite::from_color(discovered_color, VEC2_CELL_SIZE),
+                Transform::from_xyz(world_x as f32, world_y as f32, 5.0),
+                DiscoveredCellVisualizer,
+            ));
         }
     }
 }
