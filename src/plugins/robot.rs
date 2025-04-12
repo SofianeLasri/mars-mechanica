@@ -169,7 +169,8 @@ fn spawn_miner_robot(
 
 /// Detects the environment around the robot and updates the world knowledge accordingly.
 ///
-/// The robot detects the terrain cells and solid objects within a radius of 8 cells.
+/// The robot detects empty terrain cells within a radius of 8 cells,
+/// but solid objects only at a radius of 1 cell to avoid "seeing through walls".
 fn detect_environment(
     robot_query: Query<(&Transform, &ExplorerRobot)>,
     terrain_query: Query<(&Transform, &TerrainCell, Option<&Children>)>,
@@ -183,6 +184,7 @@ fn detect_environment(
         let robot_cell_y = (robot_pos.y / CELL_SIZE as f32).round() as i32;
 
         let detection_radius = 8;
+        let solid_detection_radius = 1; // Reduced radius for solid objects
 
         for dx in -detection_radius..=detection_radius {
             for dy in -detection_radius..=detection_radius {
@@ -193,6 +195,8 @@ fn detect_environment(
                 let cell_x = robot_cell_x + dx;
                 let cell_y = robot_cell_y + dy;
                 let cell_pos = IVec2::new(cell_x, cell_y);
+
+                let dist_squared = dx * dx + dy * dy;
 
                 world_knowledge.discovered_cells.insert(cell_pos);
 
@@ -209,9 +213,16 @@ fn detect_environment(
                             for child in children.iter() {
                                 if let Ok(solid) = solid_query.get(child) {
                                     has_solid = true;
-                                    world_knowledge
-                                        .discovered_solids
-                                        .insert(cell_pos, solid.material_id.clone());
+
+                                    // Only add the solid object if:
+                                    // 1. It's within the solid detection radius OR
+                                    // 2. It's already known
+                                    if dist_squared <= solid_detection_radius * solid_detection_radius ||
+                                        world_knowledge.discovered_solids.contains_key(&cell_pos) {
+                                        world_knowledge
+                                            .discovered_solids
+                                            .insert(cell_pos, solid.material_id.clone());
+                                    }
                                     break;
                                 }
                             }
