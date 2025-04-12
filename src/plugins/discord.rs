@@ -51,21 +51,17 @@ fn handle_reconnection(
         return;
     }
 
-    // Ajouter le temps écoulé
     reconnect_timer.time += time.delta_secs();
 
-    // Calculer le délai basé sur les tentatives (backoff exponentiel avec un max de 60 secondes)
     let delay = (2_u32.pow(reconnect_timer.attempts.min(5)) as f32).min(60.0);
 
-    // Si assez de temps s'est écoulé, essayer de se reconnecter
     if reconnect_timer.time >= delay {
         reconnect_timer.time = 0.0;
         reconnect_timer.attempts += 1;
 
         println!("Attempting to reconnect to Discord (attempt {})", reconnect_timer.attempts);
 
-        // Remplace avec ton propre ID d'application Discord
-        const APP_ID: &str = "1234567890123456789";
+        const APP_ID: &str = "1360650879262527699";
 
         connect_to_discord(APP_ID, &mut discord_client.0);
     }
@@ -77,13 +73,10 @@ fn update_discord_presence(
     time: Res<Time>,
     mut last_update: ResMut<LastPresenceUpdate>,
 ) {
-    // Mettre à jour seulement si nous avons un client
     let Some(client) = &mut discord_client.0 else {
         return;
     };
 
-    // Mettre à jour seulement si l'état du jeu a changé ou toutes les 15 secondes
-    // Discord a une limite de taux, donc on ne devrait pas mettre à jour trop fréquemment
     if game_state.get() == &last_update.state
         && time.elapsed().as_secs_f64() - last_update.time < 15.0 {
         return;
