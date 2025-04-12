@@ -8,6 +8,12 @@ Ceci est un projet scolaire réalisé en Rust qui a pour but de simuler un essai
 Les robots sont capables de se déplacer, de communiquer entre eux et de récolter des ressources. Ils doivent coopérer
 pour survivre et accomplir des objectifs.
 
+## Simplifications apportées au sujet
+
+- Le robot explorateur partage sa base de données avec les autres robots en temps réel. Il n'a pas besoin de retourner à
+  la base
+  pour partager ses découvertes.
+
 ## Information
 
 Les valeurs à "tweaker" sont dans le fichier `src/components/terrain.rs`.
