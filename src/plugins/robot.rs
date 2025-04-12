@@ -20,7 +20,7 @@ impl Plugin for RobotPlugin {
                 FixedUpdate,
                 (
                     detect_environment,
-                    plan_robot_movement,
+                    plan_explorer_robot_movement,
                     plan_miner_movement,
                     move_robots,
                     check_miner_collection,
@@ -233,7 +233,7 @@ fn detect_environment(
 
 /// Plans the movement of the robot based on the world knowledge. It is programmed to follow
 /// the walls and explore the environment.
-fn plan_robot_movement(
+fn plan_explorer_robot_movement(
     mut robot_query: Query<(&Transform, &mut ExplorerRobot)>,
     world_knowledge: Res<WorldKnowledge>,
     time: Res<Time>,
