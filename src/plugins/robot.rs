@@ -379,10 +379,15 @@ fn plan_robot_movement(
 fn plan_miner_movement(
     mut miner_query: Query<(&Transform, &mut MinerRobot)>,
     world_knowledge: Res<WorldKnowledge>,
-    terrain_query: Query<(&Transform, &TerrainCell, Option<&Children>)>,
-    solid_query: Query<&SolidObject>,
     time: Res<Time>,
 ) {
+    let red_crystal_count = world_knowledge.discovered_solids
+        .iter()
+        .filter(|(_, material_id)| *material_id == "red_crystal")
+        .count();
+
+    info!("Known red crystals: {}", red_crystal_count);
+
     for (transform, mut miner) in miner_query.iter_mut() {
         if miner.is_moving {
             miner.move_timer += time.delta_secs();
@@ -397,78 +402,89 @@ fn plan_miner_movement(
         let current_cell_y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
         let current_cell = IVec2::new(current_cell_x, current_cell_y);
 
+        info!("Miner at position: ({}, {}), task: {:?}", current_cell_x, current_cell_y, miner.current_task);
+
         match miner.current_task {
             MinerTask::Idle => {
-                let red_crystal_positions: Vec<IVec2> = world_knowledge
+                let red_crystal_positions: Vec<(IVec2, &String)> = world_knowledge
                     .discovered_solids
                     .iter()
                     .filter(|(_, material_id)| *material_id == "red_crystal")
-                    .map(|(pos, _)| *pos)
+                    .map(|(pos, material_id)| (*pos, material_id))
                     .collect();
 
-                /*// Echo all discovered solids material ids
-                for (pos, material_id) in &world_knowledge.discovered_solids {
-                    info!("Discovered solid at {:?} with material id: {}", pos, material_id);
-                }*/
+                for (pos, _) in &red_crystal_positions {
+                    info!("Found red crystal at: ({}, {})", pos.x, pos.y);
+                }
 
                 if red_crystal_positions.is_empty() {
+                    info!("No red crystals known, staying idle");
                     continue;
                 }
 
-                if let Some(closest_pos) =
-                    find_closest_position(current_cell, &red_crystal_positions)
-                {
-                    let crystal_exists = terrain_query
+                let closest_crystal = red_crystal_positions
+                    .iter()
+                    .min_by_key(|(pos, _)| {
+                        let dx = pos.x - current_cell.x;
+                        let dy = pos.y - current_cell.y;
+                        dx * dx + dy * dy
+                    })
+                    .map(|(pos, _)| *pos);
+
+                if let Some(target_pos) = closest_crystal {
+                    info!("Targeting red crystal at: ({}, {})", target_pos.x, target_pos.y);
+
+                    let adjacent_cells = get_adjacent_cells(target_pos);
+                    let accessible_adjacent = adjacent_cells
                         .iter()
-                        .filter(|(transform, _, _)| {
-                            let cell_x =
-                                (transform.translation.x / CELL_SIZE as f32).round() as i32;
-                            let cell_y =
-                                (transform.translation.y / CELL_SIZE as f32).round() as i32;
-                            IVec2::new(cell_x, cell_y) == closest_pos
-                        })
-                        .any(|(_, _, children)| {
-                            if let Some(children) = children {
-                                for child in children.iter() {
-                                    if let Ok(solid) = solid_query.get(child) {
-                                        return solid.material_id == "red_crystal";
-                                    }
-                                }
-                            }
-                            false
+                        .filter(|pos| world_knowledge.discovered_empty.contains(pos))
+                        .min_by_key(|pos| {
+                            let dx = pos.x - current_cell.x;
+                            let dy = pos.y - current_cell.y;
+                            dx * dx + dy * dy
                         });
 
-                    if crystal_exists {
-                        let path = find_path(current_cell, closest_pos, &world_knowledge);
+                    if let Some(&adjacent_pos) = accessible_adjacent {
+                        info!("Found accessible cell adjacent to crystal: ({}, {})", adjacent_pos.x, adjacent_pos.y);
+
+                        let path = find_path(current_cell, adjacent_pos, &world_knowledge);
+
                         if !path.is_empty() {
+                            info!("Path found, next step: ({}, {})", path[0].x, path[0].y);
                             miner.target_position = path[0];
+                            miner.is_moving = true;
+                            miner.move_timer = 0.0;
+                            miner.current_task = MinerTask::MovingToTarget;
+                        } else {
+                            info!("No path found to crystal");
+                        }
+                    } else {
+                        info!("No accessible cells adjacent to crystal");
+
+                        let path_to_crystal = find_partial_path(current_cell, target_pos, &world_knowledge);
+                        if !path_to_crystal.is_empty() {
+                            info!("Found partial path toward crystal");
+                            miner.target_position = path_to_crystal[0];
                             miner.is_moving = true;
                             miner.move_timer = 0.0;
                             miner.current_task = MinerTask::MovingToTarget;
                         }
                     }
                 }
-            }
+            },
             MinerTask::MovingToTarget => {
-                let is_at_crystal = terrain_query
+                let adjacent_cells = get_adjacent_cells(current_cell);
+                let has_adjacent_crystal = adjacent_cells
                     .iter()
-                    .filter(|(transform, _, _)| {
-                        let cell_x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
-                        let cell_y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
-                        IVec2::new(cell_x, cell_y) == current_cell
-                    })
-                    .any(|(_, _, children)| {
-                        if let Some(children) = children {
-                            for child in children.iter() {
-                                if let Ok(solid) = solid_query.get(child) {
-                                    return solid.material_id == "red_crystal";
-                                }
-                            }
+                    .any(|pos| {
+                        if let Some(material) = world_knowledge.discovered_solids.get(pos) {
+                            return material == "red_crystal";
                         }
                         false
                     });
 
-                if is_at_crystal {
+                if has_adjacent_crystal {
+                    info!("Miner is adjacent to a red crystal, starting mining");
                     miner.current_task = MinerTask::Mining;
                     continue;
                 }
@@ -481,35 +497,62 @@ fn plan_miner_movement(
                     .collect();
 
                 if red_crystal_positions.is_empty() {
+                    info!("No more red crystals known, returning to spawn");
                     miner.current_task = MinerTask::ReturningToSpawn;
                     continue;
                 }
 
-                if let Some(closest_pos) =
-                    find_closest_position(current_cell, &red_crystal_positions)
-                {
-                    let path = find_path(current_cell, closest_pos, &world_knowledge);
-                    if !path.is_empty() {
-                        if path[0] != miner.target_position {
+                let closest_crystal = red_crystal_positions
+                    .iter()
+                    .min_by_key(|pos| {
+                        let dx = pos.x - current_cell.x;
+                        let dy = pos.y - current_cell.y;
+                        dx * dx + dy * dy
+                    })
+                    .copied();
+
+                if let Some(target_pos) = closest_crystal {
+                    let adjacent_cells = get_adjacent_cells(target_pos);
+                    let accessible_adjacent = adjacent_cells
+                        .iter()
+                        .filter(|pos| world_knowledge.discovered_empty.contains(pos))
+                        .min_by_key(|pos| {
+                            let dx = pos.x - current_cell.x;
+                            let dy = pos.y - current_cell.y;
+                            dx * dx + dy * dy
+                        });
+
+                    if let Some(&adjacent_pos) = accessible_adjacent {
+                        let path = find_path(current_cell, adjacent_pos, &world_knowledge);
+
+                        if !path.is_empty() {
                             miner.target_position = path[0];
+                            miner.is_moving = true;
+                            miner.move_timer = 0.0;
+                        } else {
+                            let path_to_crystal = find_partial_path(current_cell, target_pos, &world_knowledge);
+                            if !path_to_crystal.is_empty() {
+                                miner.target_position = path_to_crystal[0];
+                                miner.is_moving = true;
+                                miner.move_timer = 0.0;
+                            }
+                        }
+                    } else {
+                        let path_to_crystal = find_partial_path(current_cell, target_pos, &world_knowledge);
+                        if !path_to_crystal.is_empty() {
+                            miner.target_position = path_to_crystal[0];
                             miner.is_moving = true;
                             miner.move_timer = 0.0;
                         }
                     }
-                } else {
-                    miner.current_task = MinerTask::ReturningToSpawn;
                 }
-            }
+            },
             MinerTask::Mining => {
-                // Le minage est géré dans un système séparé
-                // Ce système gère juste les déplacements entre les tâches
-            }
+                // Cette partie est traitée dans check_miner_collection
+            },
             MinerTask::ReturningToSpawn => {
                 if current_cell == miner.spawn_position {
-                    info!(
-                        "Miner rover returned to spawn with resources: {:?}",
-                        miner.collected_resources
-                    );
+                    info!("Miner returned to spawn with resources: {:?}", miner.collected_resources);
                     miner.collected_resources.clear();
                     miner.current_task = MinerTask::Idle;
                     continue;
@@ -520,6 +563,13 @@ fn plan_miner_movement(
                     miner.target_position = path[0];
                     miner.is_moving = true;
                     miner.move_timer = 0.0;
+                } else {
+                    let partial_path = find_partial_path(current_cell, miner.spawn_position, &world_knowledge);
+                    if !partial_path.is_empty() {
+                        miner.target_position = partial_path[0];
+                        miner.is_moving = true;
+                        miner.move_timer = 0.0;
+                    }
                 }
             }
         }
@@ -541,50 +591,56 @@ fn check_miner_collection(
         let miner_pos_y = (miner_transform.translation.y / CELL_SIZE as f32).round() as i32;
         let miner_pos = IVec2::new(miner_pos_x, miner_pos_y);
 
-        if miner.current_task == MinerTask::Mining {
-            for (terrain_transform, _, chunk, children) in terrain_query.iter() {
-                let cell_x = (terrain_transform.translation.x / CELL_SIZE as f32).round() as i32;
-                let cell_y = (terrain_transform.translation.y / CELL_SIZE as f32).round() as i32;
-                let cell_pos = IVec2::new(cell_x, cell_y);
-
-                if cell_pos == miner_pos && children.is_some() {
-                    for child in children.unwrap().iter() {
-                        if let Ok((_solid_entity, mut solid)) = solid_query.get_mut(child) {
-                            if solid.material_id == "red_crystal" {
-                                solid.health = 0.0;
-
-                                world_knowledge.discovered_solids.remove(&miner_pos);
-                                world_knowledge.discovered_empty.insert(miner_pos);
-
-                                update_terrain_events.write(UpdateTerrainEvent {
-                                    region: None,
-                                    chunk_coords: Some((chunk.chunk_x, chunk.chunk_y)),
-                                });
-
-                                miner.current_task = MinerTask::Idle;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         for (item_entity, item_transform, item) in item_query.iter() {
             let item_pos_x = (item_transform.translation.x / CELL_SIZE as f32).round() as i32;
             let item_pos_y = (item_transform.translation.y / CELL_SIZE as f32).round() as i32;
             let item_pos = IVec2::new(item_pos_x, item_pos_y);
 
             if miner_pos == item_pos && item.entity_id == "red_crystal_item" {
-                miner
-                    .collected_resources
-                    .push((item.entity_id.clone(), item.quantity));
+                info!("Miner collecting {} x{} at ({}, {})", item.entity_id, item.quantity, item_pos.x, item_pos.y);
+                miner.collected_resources.push((item.entity_id.clone(), item.quantity));
                 commands.entity(item_entity).despawn();
 
                 if miner.current_task == MinerTask::Idle {
                     miner.current_task = MinerTask::ReturningToSpawn;
                 }
             }
+        }
+
+        if miner.current_task == MinerTask::Mining {
+            let adjacent_cells = get_adjacent_cells(miner_pos);
+            for adj_pos in adjacent_cells {
+                for (terrain_transform, _, chunk, children) in terrain_query.iter() {
+                    let cell_x = (terrain_transform.translation.x / CELL_SIZE as f32).round() as i32;
+                    let cell_y = (terrain_transform.translation.y / CELL_SIZE as f32).round() as i32;
+                    let cell_pos = IVec2::new(cell_x, cell_y);
+
+                    if cell_pos == adj_pos && children.is_some() {
+                        for child in children.unwrap().iter() {
+                            if let Ok((_solid_entity, mut solid)) = solid_query.get_mut(child) {
+                                if solid.material_id == "red_crystal" {
+                                    info!("Mining red crystal at ({}, {})", adj_pos.x, adj_pos.y);
+                                    solid.health = 0.0;
+
+                                    world_knowledge.discovered_solids.remove(&adj_pos);
+                                    world_knowledge.discovered_empty.insert(adj_pos);
+
+                                    update_terrain_events.write(UpdateTerrainEvent {
+                                        region: None,
+                                        chunk_coords: Some((chunk.chunk_x, chunk.chunk_y)),
+                                    });
+
+                                    miner.current_task = MinerTask::Idle;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            info!("No crystals found to mine, returning to idle state");
+            miner.current_task = MinerTask::Idle;
         }
     }
 }
@@ -635,6 +691,15 @@ fn find_closest_position(current_pos: IVec2, target_positions: &[IVec2]) -> Opti
         .copied()
 }
 
+fn get_adjacent_cells(pos: IVec2) -> [IVec2; 4] {
+    [
+        IVec2::new(pos.x + 1, pos.y),
+        IVec2::new(pos.x - 1, pos.y),
+        IVec2::new(pos.x, pos.y + 1),
+        IVec2::new(pos.x, pos.y - 1),
+    ]
+}
+
 /// Finds a path from the start position to the goal position using BFS.
 fn find_path(start: IVec2, goal: IVec2, world_knowledge: &WorldKnowledge) -> Vec<IVec2> {
     if start == goal {
@@ -667,9 +732,8 @@ fn find_path(start: IVec2, goal: IVec2, world_knowledge: &WorldKnowledge) -> Vec
                 continue;
             }
 
-            let is_walkable = world_knowledge.discovered_empty.contains(&next)
-                || (world_knowledge.discovered_cells.contains(&next)
-                && !world_knowledge.discovered_solids.contains_key(&next));
+            let is_walkable = (next == goal) ||
+                world_knowledge.discovered_empty.contains(&next);
 
             if !is_walkable {
                 continue;
@@ -685,13 +749,99 @@ fn find_path(start: IVec2, goal: IVec2, world_knowledge: &WorldKnowledge) -> Vec
     let mut current = goal;
 
     while current != start {
-        path.push(current);
         match came_from.get(&current) {
-            Some(&prev) => current = prev,
-            None => return Vec::new(), // No path found
+            Some(&prev) => {
+                path.push(current);
+                current = prev;
+            },
+            None => return Vec::new(),
         }
     }
 
     path.reverse();
     path
+}
+
+/// Finds a partial path from the start position to the goal position using BFS.
+fn find_partial_path(start: IVec2, goal: IVec2, world_knowledge: &WorldKnowledge) -> Vec<IVec2> {
+    let mut queue = VecDeque::new();
+    let mut visited = HashSet::new();
+    let mut came_from = HashMap::new();
+    let mut best_pos = start;
+    let mut best_distance = distance(start, goal);
+
+    queue.push_back(start);
+    visited.insert(start);
+
+    let directions = [
+        IVec2::new(1, 0),
+        IVec2::new(0, 1),
+        IVec2::new(-1, 0),
+        IVec2::new(0, -1),
+    ];
+
+    let max_depth = 20;
+    let mut depth = 0;
+    let mut current_level_size = 1;
+    let mut next_level_size = 0;
+
+    while let Some(current) = queue.pop_front() {
+        let current_distance = distance(current, goal);
+        if current_distance < best_distance {
+            best_distance = current_distance;
+            best_pos = current;
+        }
+
+        if depth < max_depth {
+            for dir in &directions {
+                let next = current + *dir;
+
+                if visited.contains(&next) {
+                    continue;
+                }
+
+                let is_walkable = world_knowledge.discovered_empty.contains(&next);
+
+                if !is_walkable {
+                    continue;
+                }
+
+                visited.insert(next);
+                came_from.insert(next, current);
+                queue.push_back(next);
+                next_level_size += 1;
+            }
+        }
+
+        current_level_size -= 1;
+        if current_level_size == 0 {
+            depth += 1;
+            current_level_size = next_level_size;
+            next_level_size = 0;
+        }
+    }
+
+    if best_pos != start {
+        let mut path = Vec::new();
+        let mut current = best_pos;
+
+        while current != start {
+            path.push(current);
+            match came_from.get(&current) {
+                Some(&prev) => current = prev,
+                None => break,
+            }
+        }
+
+        path.reverse();
+        return path;
+    }
+
+    Vec::new()
+}
+
+fn distance(a: IVec2, b: IVec2) -> i32 {
+    let dx = a.x - b.x;
+    let dy = a.y - b.y;
+    dx * dx + dy * dy
 }
