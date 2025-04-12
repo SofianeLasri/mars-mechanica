@@ -11,6 +11,25 @@ pub struct ExplorerRobot {
     pub follow_direction: i8, // 1 pour sens horaire, -1 pour anti-horaire
 }
 
+#[derive(Component)]
+pub struct MinerRobot {
+    pub speed: f32,
+    pub target_position: IVec2,
+    pub is_moving: bool,
+    pub move_timer: f32,
+    pub current_task: MinerTask,
+    pub spawn_position: IVec2,
+    pub collected_resources: Vec<(String, i32)>, // (entity_id, quantity)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MinerTask {
+    Idle,
+    MovingToTarget,
+    Mining,
+    ReturningToSpawn,
+}
+
 #[derive(Resource, Default)]
 pub struct WorldKnowledge {
     pub discovered_cells: HashSet<IVec2>,
