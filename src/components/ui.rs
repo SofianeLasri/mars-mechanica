@@ -38,6 +38,32 @@ pub(crate) struct UiCamera;
 #[derive(Component)]
 pub struct UiSound;
 
+#[derive(Component)]
+pub struct SeedInputScreen;
+
+#[derive(Component)]
+pub struct SeedInputValue {
+    pub value: String,
+}
+
+#[derive(Component)]
+pub struct SeedInputValueText;
+
+#[derive(Component)]
+pub struct SeedIncrementButton;
+
+#[derive(Component)]
+pub struct SeedDecrementButton;
+
+#[derive(Component)]
+pub struct SeedRandomizeButton;
+
+#[derive(Component)]
+pub struct SeedSubmitButton;
+
+#[derive(Component)]
+pub struct SeedCancelButton;
+
 pub const SIDEBAR_COLOR: Color = Color::srgb(0.075, 0.075, 0.075);
 pub const BUTTON_HOVER_COLOR: Color = Color::srgb(0.15, 0.15, 0.15);
 pub const TEXT_COLOR: Color = Color::WHITE;

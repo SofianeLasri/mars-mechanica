@@ -2,12 +2,12 @@ mod components;
 mod plugins;
 mod systems;
 
-use bevy::DefaultPlugins;
-use bevy::prelude::{App, AppExtStates, ClearColor, Color, PluginGroup, Resource, States, Window, WindowPlugin};
 use crate::plugins::asset_preloader::AssetPreloaderPlugin;
 use crate::plugins::game::GamePlugin;
 use crate::plugins::splash::SplashPlugin;
 use crate::plugins::ui::UiPlugin;
+use bevy::prelude::{App, AppExtStates, ClearColor, Color, PluginGroup, Resource, States, Window, WindowPlugin};
+use bevy::DefaultPlugins;
 
 #[derive(Resource)]
 struct CliArgs {
@@ -20,6 +20,7 @@ enum GameState {
     AssetLoading,
     SplashScreen,
     MainMenu,
+    SeedInput,
     Loading,
     InGame,
 }

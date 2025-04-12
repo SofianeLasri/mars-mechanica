@@ -11,14 +11,19 @@ pub fn generate_world(
     world_materials: Res<WorldMaterials>,
     mut chunk_map: ResMut<ChunkMap>,
     mut event_writer: EventWriter<UpdateTerrainEvent>,
-    mut next_state: ResMut<NextState<GameState>>
+    mut next_state: ResMut<NextState<GameState>>,
+    world_seed: Option<Res<WorldSeed>>
 ) {
-    let world_seed = random::<u32>();
-    let terrain_noise = Perlin::new(world_seed);
-    let material_noise = Perlin::new(world_seed);
+    let seed_value = if let Some(seed) = world_seed {
+        seed.0
+    } else {
+        let new_seed = random::<u32>();
+        commands.insert_resource(WorldSeed(new_seed));
+        new_seed
+    };
 
-    commands.insert_resource(WorldSeed(world_seed));
-    info!("World seed: {}", world_seed);
+    let terrain_noise = Perlin::new(seed_value);
+    let material_noise = Perlin::new(seed_value);
 
     info!("Generating world...");
 
