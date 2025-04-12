@@ -61,11 +61,6 @@ cargo build --release
 - **Molette** : Zoom in/out
 - **Clic gauche** : Interaction avec les blocs (selon le mode sélectionné dans la toolbox)
 
-### Interface
-
-- **Barre de débogage** (bas de l'écran) : Affiche les informations sur le jeu
-- **Toolbox** (haut droite) : Permet de sélectionner les modes d'interaction et de visualisation
-
 ### Paramètres de démarrage
 
 - `--skip-splash` : Ignorer l'animation d'introduction (accélère **grandement** le chargement du jeu en compilation dev)
@@ -90,6 +85,12 @@ Les valeurs principales à ajuster sont dans le fichier `src/components/terrain.
   place des chunks).
 - Les blocs de critaux rouges ne sont pas détectés s'ils ne sont pas placés sur un flan de montagne.
 - Cliquer sur la toolbox revient à cliquer sur le terrain, ce qui peut causer des interactions non désirées.
+
+## Wiki
+
+Si vous êtes intéressé par le projet, vous pouvez consulter le wiki pour plus de détails.
+
+https://github.com/SofianeLasri/mars-mechanica/wiki
 
 ## Crédits
 
