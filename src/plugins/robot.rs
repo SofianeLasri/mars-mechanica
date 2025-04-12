@@ -413,8 +413,6 @@ fn plan_miner_movement(
         let current_cell_y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
         let current_cell = IVec2::new(current_cell_x, current_cell_y);
 
-        info!("Miner at position: ({}, {}), task: {:?}", current_cell_x, current_cell_y, miner.current_task);
-
         match miner.current_task {
             MinerTask::Idle => {
                 let red_crystal_positions: Vec<(IVec2, &String)> = world_knowledge
@@ -429,7 +427,6 @@ fn plan_miner_movement(
                 }
 
                 if red_crystal_positions.is_empty() {
-                    info!("No red crystals known, staying idle");
                     continue;
                 }
 
