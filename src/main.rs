@@ -3,6 +3,7 @@ mod plugins;
 mod systems;
 
 use crate::plugins::asset_preloader::AssetPreloaderPlugin;
+use crate::plugins::discord::DiscordPlugin;
 use crate::plugins::game::GamePlugin;
 use crate::plugins::splash::SplashPlugin;
 use crate::plugins::ui::UiPlugin;
@@ -43,7 +44,7 @@ fn main() {
         }))
         .insert_resource(ClearColor(Color::BLACK))
         .init_state::<GameState>()
-        .add_plugins((AssetPreloaderPlugin, SplashPlugin, UiPlugin, GamePlugin))
+        .add_plugins((AssetPreloaderPlugin, SplashPlugin, UiPlugin, GamePlugin, DiscordPlugin))
         .add_systems(Startup, set_window_icon)
         .run();
 }

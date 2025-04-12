@@ -7,3 +7,4 @@ pub mod game;
 pub mod splash;
 pub mod asset_preloader;
 pub mod robot;
+pub mod discord;
