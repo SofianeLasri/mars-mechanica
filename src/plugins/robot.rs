@@ -392,13 +392,6 @@ fn plan_miner_movement(
     world_knowledge: Res<WorldKnowledge>,
     time: Res<Time>,
 ) {
-    let red_crystal_count = world_knowledge.discovered_solids
-        .iter()
-        .filter(|(_, material_id)| *material_id == "red_crystal")
-        .count();
-
-    info!("Known red crystals: {}", red_crystal_count);
-
     for (transform, mut miner) in miner_query.iter_mut() {
         if miner.is_moving {
             miner.move_timer += time.delta_secs();
@@ -422,10 +415,6 @@ fn plan_miner_movement(
                     .map(|(pos, material_id)| (*pos, material_id))
                     .collect();
 
-                for (pos, _) in &red_crystal_positions {
-                    info!("Found red crystal at: ({}, {})", pos.x, pos.y);
-                }
-
                 if red_crystal_positions.is_empty() {
                     continue;
                 }
@@ -440,8 +429,6 @@ fn plan_miner_movement(
                     .map(|(pos, _)| *pos);
 
                 if let Some(target_pos) = closest_crystal {
-                    info!("Targeting red crystal at: ({}, {})", target_pos.x, target_pos.y);
-
                     let adjacent_cells = get_adjacent_cells(target_pos);
                     let accessible_adjacent = adjacent_cells
                         .iter()
