@@ -22,6 +22,11 @@ struct WorldSeedText;
 struct GraphicAdapterText;
 
 #[derive(Component)]
+pub struct DiscoveredCellType {
+    pub is_solid: bool,
+}
+
+#[derive(Component)]
 pub struct ToolboxToggle {
     pub name: String,
     pub value: bool,
@@ -652,16 +657,21 @@ fn update_discovered_cells_visualization(
         return;
     }
 
-    let discovered_color = Color::srgba(0.0, 1.0, 0.2, 0.2); // Vert transparent à 20%
+    let empty_cell_color = Color::srgba(0.0, 1.0, 0.2, 0.2);
+    let solid_cell_color = Color::srgba(1.0, 0.5, 0.0, 0.2);
 
     for cell_pos in &world_knowledge.discovered_cells {
         let world_x = cell_pos.x * CELL_SIZE;
         let world_y = cell_pos.y * CELL_SIZE;
 
+        let is_solid = world_knowledge.discovered_solids.contains_key(cell_pos);
+        let cell_color = if is_solid { solid_cell_color } else { empty_cell_color };
+
         commands.spawn((
-            Sprite::from_color(discovered_color, VEC2_CELL_SIZE),
-            Transform::from_xyz(world_x as f32, world_y as f32, 5.0), // Z=5 pour être au-dessus du terrain mais sous les entités
+            Sprite::from_color(cell_color, VEC2_CELL_SIZE),
+            Transform::from_xyz(world_x as f32, world_y as f32, 5.0),
             DiscoveredCellVisualizer,
+            DiscoveredCellType { is_solid },
         ));
     }
 }
@@ -676,7 +686,6 @@ fn update_new_discovered_cells(
         return;
     }
 
-    // Collecter les positions des visualiseurs existants
     let mut existing_positions = HashSet::new();
     for (_, transform) in visualizer_query.iter() {
         let cell_x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
@@ -684,18 +693,22 @@ fn update_new_discovered_cells(
         existing_positions.insert(IVec2::new(cell_x, cell_y));
     }
 
-    // Créer des visualisations uniquement pour les nouvelles cellules
-    let discovered_color = Color::srgba(0.0, 1.0, 0.2, 0.2);
+    let empty_cell_color = Color::srgba(0.0, 1.0, 0.2, 0.2);
+    let solid_cell_color = Color::srgba(1.0, 0.5, 0.0, 0.2);
 
     for cell_pos in &world_knowledge.discovered_cells {
         if !existing_positions.contains(cell_pos) {
             let world_x = cell_pos.x * CELL_SIZE;
             let world_y = cell_pos.y * CELL_SIZE;
 
+            let is_solid = world_knowledge.discovered_solids.contains_key(cell_pos);
+            let cell_color = if is_solid { solid_cell_color } else { empty_cell_color };
+
             commands.spawn((
-                Sprite::from_color(discovered_color, VEC2_CELL_SIZE),
+                Sprite::from_color(cell_color, VEC2_CELL_SIZE),
                 Transform::from_xyz(world_x as f32, world_y as f32, 5.0),
                 DiscoveredCellVisualizer,
+                DiscoveredCellType { is_solid },
             ));
         }
     }
