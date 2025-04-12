@@ -1,4 +1,7 @@
-use crate::components::{ChunkUtils, HoverState, SolidObject, TerrainCell, TerrainChunk, UpdateTerrainEvent, WorldMaterials, CELL_SIZE, VEC2_CELL_SIZE};
+use crate::components::{
+    ChunkUtils, HoverState, SolidObject, TerrainCell, TerrainChunk, UpdateTerrainEvent, WorldMaterials,
+    CELL_SIZE, VEC2_CELL_SIZE,
+};
 use crate::plugins::camera::get_cursor_world_position;
 use crate::plugins::debug_ui::{DebugHoverText, ToolboxState};
 use crate::GameState;
@@ -28,7 +31,11 @@ impl Plugin for InteractionPlugin {
 pub fn init(mut commands: Commands) {
     let semi_transparent_white = Color::srgba(1.0, 1.0, 1.0, 0.5);
     let sprite = Sprite::from_color(semi_transparent_white, VEC2_CELL_SIZE);
-    commands.spawn((sprite, InteractionSprite, Transform::from_xyz(0.0, 0.0, -100.0))); // Commencer hors vue
+    commands.spawn((
+        sprite,
+        InteractionSprite,
+        Transform::from_xyz(0.0, 0.0, -100.0),
+    )); // Commencer hors vue
 }
 
 /// This system will detect when the cursor is hovering over a terrain cell and update the visual effect
@@ -36,14 +43,24 @@ pub fn hover_detection(
     mut commands: Commands,
     window_query: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform, &Projection)>,
-    terrain_cells_query: Query<(Entity, &Transform, &TerrainCell, Option<&Children>, &TerrainChunk)>,
+    terrain_cells_query: Query<(
+        Entity,
+        &Transform,
+        &TerrainCell,
+        Option<&Children>,
+        &TerrainChunk,
+    )>,
     solid_objects_query: Query<(Entity, Option<&HoverState>, &SolidObject)>,
-    mut interaction_sprite_query: Query<(Entity, &mut Transform), (With<InteractionSprite>, Without<TerrainCell>)>,
+    mut interaction_sprite_query: Query<
+        (Entity, &mut Transform),
+        (With<InteractionSprite>, Without<TerrainCell>),
+    >,
     mut text_query: Query<Entity, With<DebugHoverText>>,
     mut writer: TextUiWriter,
     toolbox_state: Res<ToolboxState>,
 ) {
-    let (interaction_sprite, mut interaction_transform) = interaction_sprite_query.single_mut().unwrap();
+    let (_interaction_sprite, mut interaction_transform) =
+        interaction_sprite_query.single_mut().unwrap();
     let cursor_world_position = get_cursor_world_position(window_query, camera_query);
 
     // Reset all hover states
@@ -56,7 +73,7 @@ pub fn hover_detection(
     let cursor_y = (cursor_world_position.y / CELL_SIZE as f32).round() as i32;
     let (cursor_chunk_x, cursor_chunk_y) = ChunkUtils::world_to_chunk_coords(cursor_x, cursor_y);
 
-    for (terrain_entity, transform, _, has_children, chunk) in terrain_cells_query.iter() {
+    for (_terrain_entity, transform, _, has_children, chunk) in terrain_cells_query.iter() {
         if chunk.chunk_x != cursor_chunk_x || chunk.chunk_y != cursor_chunk_y {
             continue;
         }
@@ -78,17 +95,19 @@ pub fn hover_detection(
             && cursor_world_position.y <= block_max.y;
 
         if block_is_hovered {
-            let mut should_highlight = false;
+            let should_highlight: bool;
 
             // Check if cell has children
             if let Some(children) = has_children {
                 // Check if cell has a solid object
-                let has_solid_object = children.iter().any(|child| solid_objects_query.get(child).is_ok());
+                let has_solid_object = children
+                    .iter()
+                    .any(|child| solid_objects_query.get(child).is_ok());
 
                 // Apply toolbox filtering
-                should_highlight = toolbox_state.select_all ||
-                    (toolbox_state.select_solid_objects && has_solid_object) ||
-                    (toolbox_state.select_empty_cells && children.is_empty());
+                should_highlight = toolbox_state.select_all
+                    || (toolbox_state.select_solid_objects && has_solid_object)
+                    || (toolbox_state.select_empty_cells && children.is_empty());
             } else {
                 // No children, so it's empty
                 should_highlight = toolbox_state.select_all || toolbox_state.select_empty_cells;
@@ -132,7 +151,10 @@ pub fn block_click_handler(
     mut mouse_button_events: EventReader<MouseButtonInput>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     camera_query: Query<(&Camera, &GlobalTransform, &Projection)>,
-    terrain_cells_query: Query<(Entity, &Transform, Option<&Children>, &TerrainChunk), With<TerrainCell>>,
+    terrain_cells_query: Query<
+        (Entity, &Transform, Option<&Children>, &TerrainChunk),
+        With<TerrainCell>,
+    >,
     mut solid_objects_query: Query<(Entity, Option<&HoverState>, &mut SolidObject)>,
     mut update_terrain_events: EventWriter<UpdateTerrainEvent>,
     world_materials: Res<WorldMaterials>,
@@ -173,32 +195,13 @@ pub fn block_click_handler(
                 let cursor_world_position = get_cursor_world_position(window_query, camera_query);
                 let cursor_x = (cursor_world_position.x / CELL_SIZE as f32).round() as i32;
                 let cursor_y = (cursor_world_position.y / CELL_SIZE as f32).round() as i32;
-                let (cursor_chunk_x, cursor_chunk_y) = ChunkUtils::world_to_chunk_coords(cursor_x, cursor_y);
+                let (cursor_chunk_x, cursor_chunk_y) =
+                    ChunkUtils::world_to_chunk_coords(cursor_x, cursor_y);
 
-                for (terrain_entity, transform, children, chunk) in terrain_cells_query.iter() {
+                for (terrain_entity, transform, _children, chunk) in terrain_cells_query.iter() {
                     if chunk.chunk_x != cursor_chunk_x || chunk.chunk_y != cursor_chunk_y {
                         continue;
                     }
-
-                    // Check if this cell is empty
-                    /*if !children.is_empty() {
-                        //info!("Cell is not empty");
-                        // We only want to check if the children is a solid object or WorldEntityItem
-                        // This code is pretty inefficient since we're checking all the map solid objects...
-                        let has_solid_object = children.iter().any(|child| {
-                            for (entity, _, _) in solid_objects_query.iter() {
-                                if children.contains(&entity) {
-                                    return true; // Found a solid object
-                                }
-                            }
-                            false // No solid object found
-                        });
-
-                        if has_solid_object {
-                            //info!("Cell has solid object");
-                            continue;
-                        }
-                    }*/
 
                     // Check if this cell is hovered by the cursor
                     let block_size = VEC2_CELL_SIZE;
@@ -217,7 +220,10 @@ pub fn block_click_handler(
                         && cursor_world_position.y <= block_max.y;
 
                     if is_hovered {
-                        info!("Placing solid object in cell at ({}, {})", chunk.chunk_x, chunk.chunk_y);
+                        info!(
+                            "Placing solid object in cell at ({}, {})",
+                            chunk.chunk_x, chunk.chunk_y
+                        );
                         // Determine which material to place based on toolbox state
                         let material_id = if toolbox_state.solid_rock {
                             "rock"
@@ -229,7 +235,8 @@ pub fn block_click_handler(
                             "red_crystal"
                         } else {
                             "rock" // Default
-                        }.to_string();
+                        }
+                            .to_string();
 
                         // Get material definition
                         if let Some(material_def) = world_materials.materials.get(&material_id) {
@@ -245,7 +252,7 @@ pub fn block_click_handler(
                                     },
                                     TerrainChunk {
                                         chunk_x: chunk.chunk_x,
-                                        chunk_y: chunk.chunk_y
+                                        chunk_y: chunk.chunk_y,
                                     },
                                 ));
                             });

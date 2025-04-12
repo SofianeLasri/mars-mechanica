@@ -1,4 +1,3 @@
-pub mod entity;
 pub mod terrain;
 pub mod debug_ui;
 pub mod interaction;

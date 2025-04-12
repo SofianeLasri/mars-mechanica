@@ -2,7 +2,6 @@ use crate::components::entity::{ExplorerRobot, WorldKnowledge};
 use crate::components::terrain::{SolidObject, TerrainCell, CELL_SIZE, VEC2_CELL_SIZE};
 use crate::GameState;
 use bevy::prelude::*;
-use rand::prelude::*;
 
 pub struct RobotPlugin;
 
