@@ -5,9 +5,11 @@ edition = "2024"
 
 [dependencies]
 bevy_sprite = "0.16.0-rc.2"
+crossbeam-channel = "0.5.15"
 discord-rich-presence = "0.2.5"
 image = "0.25.6"
 noise = "0.9.0"
+parking_lot = "0.12.3"
 rand = "0.9.0"
 winit = "0.30.9"
 

@@ -1,34 +1,511 @@
-use crate::components::entity::{ExplorerRobot, MinerRobot, MinerTask, WorldKnowledge};
+use crate::components::entity::{ExplorerRobot, MinerRobot, MinerTask, RobotCommand, RobotResult, RobotThreadManager, WorldKnowledge};
 use crate::components::terrain::{
     SolidObject, TerrainCell, TerrainChunk, UpdateTerrainEvent, WorldEntityItem, CELL_SIZE,
     VEC2_CELL_SIZE,
 };
 use crate::GameState;
 use bevy::prelude::*;
+use crossbeam_channel::{bounded, Receiver, Sender};
+use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 pub struct RobotPlugin;
 
 impl Plugin for RobotPlugin {
     fn build(&self, app: &mut App) {
+        let (cmd_tx, cmd_rx) = bounded::<RobotCommand>(100);
+        let (res_tx, res_rx) = bounded::<RobotResult>(100);
+
+        let shared_knowledge = Arc::new(Mutex::new(WorldKnowledge::default()));
+
+        let thread_knowledge = Arc::clone(&shared_knowledge);
+        thread::spawn(move || {
+            robot_processing_thread(cmd_rx, res_tx, thread_knowledge);
+        });
+
         app.init_resource::<WorldKnowledge>()
+            .insert_resource(RobotThreadManager {
+                command_sender: cmd_tx,
+                result_receiver: res_rx,
+                shared_knowledge,
+            })
             .add_systems(
                 OnEnter(GameState::InGame),
                 (spawn_explorer_robot, spawn_miner_robot),
             )
             .add_systems(
-                FixedUpdate,
+                Update,
                 (
                     detect_environment,
-                    plan_explorer_robot_movement,
-                    plan_miner_movement,
-                    move_robots,
+                    sync_world_knowledge,
+                ).run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(
+                FixedUpdate,
+                (
+                    send_robot_commands,
+                    process_robot_results,
                     check_miner_collection,
+                    move_robots,
                 )
                     .chain()
                     .run_if(in_state(GameState::InGame)),
-            );
+            )
+            .add_systems(OnExit(GameState::InGame), shutdown_robot_threads);
     }
+}
+
+fn robot_processing_thread(
+    command_receiver: Receiver<RobotCommand>,
+    result_sender: Sender<RobotResult>,
+    shared_knowledge: Arc<Mutex<WorldKnowledge>>,
+) {
+    info!("Robot processing thread started");
+
+    let mut continue_running = true;
+    while continue_running {
+        match command_receiver.recv_timeout(Duration::from_millis(100)) {
+            Ok(command) => match command {
+                RobotCommand::UpdateWorldKnowledge(new_knowledge) => {
+                    let mut knowledge = shared_knowledge.lock();
+                    *knowledge = new_knowledge.as_ref().clone();
+                },
+                RobotCommand::PlanExplorerMovement { robot_entity, position, mut robot_data, delta_time } => {
+                    let knowledge = shared_knowledge.lock();
+
+                    if robot_data.is_moving {
+                        robot_data.move_timer += delta_time;
+                        if robot_data.move_timer >= 1.0 / robot_data.speed {
+                            robot_data.is_moving = false;
+                            robot_data.move_timer = 0.0;
+                        }
+                        continue;
+                    }
+
+                    let current_cell = position;
+
+                    if robot_data.previous_position.is_none() {
+                        robot_data.previous_position = Some(current_cell);
+                    }
+
+                    let directions = [
+                        IVec2::new(1, 0),  // droite
+                        IVec2::new(0, 1),  // haut
+                        IVec2::new(-1, 0), // gauche
+                        IVec2::new(0, -1), // bas
+                    ];
+
+                    let mut accessible_cells = Vec::new();
+                    for dir in directions.iter() {
+                        let neighbor = current_cell + *dir;
+                        if knowledge.discovered_empty.contains(&neighbor)
+                            && Some(neighbor) != robot_data.previous_position
+                        {
+                            accessible_cells.push(neighbor);
+                        }
+                    }
+
+                    if accessible_cells.is_empty() {
+                        for dir in directions.iter() {
+                            let neighbor = current_cell + *dir;
+                            if knowledge.discovered_empty.contains(&neighbor) {
+                                accessible_cells.push(neighbor);
+                            }
+                        }
+                    }
+
+                    if accessible_cells.is_empty() {
+                        continue;
+                    }
+
+                    let mut solid_neighbors = Vec::new();
+                    for dir in &directions {
+                        let check_cell = current_cell + *dir;
+                        if knowledge.discovered_solids.contains_key(&check_cell) {
+                            solid_neighbors.push(*dir);
+                        }
+                    }
+
+                    let mut next_cell = current_cell;
+
+                    if !solid_neighbors.is_empty() {
+                        solid_neighbors.sort_by_key(|dir| (dir.x.abs() + dir.y.abs()) * 10 + dir.y * 2 + dir.x);
+
+                        let solid_dir = solid_neighbors[0];
+
+                        let preferred_dir = if robot_data.follow_direction > 0 {
+                            IVec2::new(-solid_dir.y, solid_dir.x) // Rotation 90° horaire
+                        } else {
+                            IVec2::new(solid_dir.y, -solid_dir.x) // Rotation 90° anti-horaire
+                        };
+
+                        let preferred_cell = current_cell + preferred_dir;
+
+                        if knowledge.discovered_empty.contains(&preferred_cell)
+                            && Some(preferred_cell) != robot_data.previous_position
+                        {
+                            next_cell = preferred_cell;
+                        } else {
+                            let alt_dir = if robot_data.follow_direction > 0 {
+                                IVec2::new(solid_dir.y, -solid_dir.x)
+                            } else {
+                                IVec2::new(-solid_dir.y, solid_dir.x)
+                            };
+
+                            let alt_cell = current_cell + alt_dir;
+
+                            if knowledge.discovered_empty.contains(&alt_cell)
+                                && Some(alt_cell) != robot_data.previous_position
+                            {
+                                next_cell = alt_cell;
+                                robot_data.follow_direction = -robot_data.follow_direction;
+                            } else if !accessible_cells.is_empty() {
+                                next_cell = accessible_cells[0];
+                            }
+                        }
+                    } else {
+                        let cells_next_to_solid: Vec<IVec2> = accessible_cells
+                            .iter()
+                            .filter(|&&cell| {
+                                directions.iter().any(|dir| {
+                                    let adj_cell = cell + *dir;
+                                    knowledge.discovered_solids.contains_key(&adj_cell)
+                                })
+                            })
+                            .copied()
+                            .collect();
+
+                        if !cells_next_to_solid.is_empty() {
+                            next_cell = cells_next_to_solid[0];
+                        } else {
+                            let unexplored_cells: Vec<IVec2> = accessible_cells
+                                .iter()
+                                .filter(|&&cell| {
+                                    directions.iter().any(|dir| {
+                                        let neighbor = cell + *dir;
+                                        !knowledge.discovered_cells.contains(&neighbor)
+                                    })
+                                })
+                                .copied()
+                                .collect();
+
+                            if !unexplored_cells.is_empty() {
+                                next_cell = unexplored_cells[0];
+                            } else {
+                                next_cell = accessible_cells[0];
+                            }
+                        }
+                    }
+
+                    if next_cell != current_cell {
+                        let _ = result_sender.send(RobotResult::ExplorerMovementPlan {
+                            entity: robot_entity,
+                            new_target: next_cell,
+                            is_moving: true,
+                            previous_position: Some(current_cell),
+                            follow_direction: robot_data.follow_direction,
+                        });
+                    }
+                },
+                RobotCommand::PlanMinerMovement { robot_entity, position, mut robot_data, delta_time } => {
+                    let knowledge = shared_knowledge.lock();
+
+                    if robot_data.is_moving {
+                        robot_data.move_timer += delta_time;
+                        if robot_data.move_timer >= 1.0 / robot_data.speed {
+                            robot_data.is_moving = false;
+                            robot_data.move_timer = 0.0;
+                        }
+                        continue;
+                    }
+
+                    let current_cell = position;
+
+                    match robot_data.current_task {
+                        MinerTask::Idle => {
+                            let red_crystal_positions: Vec<(IVec2, &String)> = knowledge
+                                .discovered_solids
+                                .iter()
+                                .filter(|(_, material_id)| *material_id == "red_crystal")
+                                .map(|(pos, material_id)| (*pos, material_id))
+                                .collect();
+
+                            if red_crystal_positions.is_empty() {
+                                continue;
+                            }
+
+                            let closest_crystal = red_crystal_positions
+                                .iter()
+                                .min_by_key(|(pos, _)| {
+                                    let dx = pos.x - current_cell.x;
+                                    let dy = pos.y - current_cell.y;
+                                    dx * dx + dy * dy
+                                })
+                                .map(|(pos, _)| *pos);
+
+                            if let Some(target_pos) = closest_crystal {
+                                let adjacent_cells = get_adjacent_cells(target_pos);
+                                let accessible_adjacent = adjacent_cells
+                                    .iter()
+                                    .filter(|pos| knowledge.discovered_empty.contains(pos))
+                                    .min_by_key(|pos| {
+                                        let dx = pos.x - current_cell.x;
+                                        let dy = pos.y - current_cell.y;
+                                        dx * dx + dy * dy
+                                    });
+
+                                if let Some(&adjacent_pos) = accessible_adjacent {
+                                    let path = find_path(current_cell, adjacent_pos, &knowledge);
+
+                                    if !path.is_empty() {
+                                        let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                            entity: robot_entity,
+                                            new_target: path[0],
+                                            is_moving: true,
+                                            current_task: MinerTask::MovingToTarget,
+                                        });
+                                    } else {
+                                        let path_to_crystal = find_partial_path(current_cell, target_pos, &knowledge);
+                                        if !path_to_crystal.is_empty() {
+                                            let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                                entity: robot_entity,
+                                                new_target: path_to_crystal[0],
+                                                is_moving: true,
+                                                current_task: MinerTask::MovingToTarget,
+                                            });
+                                        }
+                                    }
+                                } else {
+                                    let path_to_crystal = find_partial_path(current_cell, target_pos, &knowledge);
+                                    if !path_to_crystal.is_empty() {
+                                        let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                            entity: robot_entity,
+                                            new_target: path_to_crystal[0],
+                                            is_moving: true,
+                                            current_task: MinerTask::MovingToTarget,
+                                        });
+                                    }
+                                }
+                            }
+                        },
+                        MinerTask::MovingToTarget => {
+                            let adjacent_cells = get_adjacent_cells(current_cell);
+                            let has_adjacent_crystal = adjacent_cells
+                                .iter()
+                                .any(|pos| {
+                                    if let Some(material) = knowledge.discovered_solids.get(pos) {
+                                        return material == "red_crystal";
+                                    }
+                                    false
+                                });
+
+                            if has_adjacent_crystal {
+                                let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                    entity: robot_entity,
+                                    new_target: current_cell,
+                                    is_moving: false,
+                                    current_task: MinerTask::Mining,
+                                });
+                                continue;
+                            }
+
+                            let red_crystal_positions: Vec<IVec2> = knowledge
+                                .discovered_solids
+                                .iter()
+                                .filter(|(_, material_id)| *material_id == "red_crystal")
+                                .map(|(pos, _)| *pos)
+                                .collect();
+
+                            if red_crystal_positions.is_empty() {
+                                let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                    entity: robot_entity,
+                                    new_target: current_cell,
+                                    is_moving: false,
+                                    current_task: MinerTask::ReturningToSpawn,
+                                });
+                                continue;
+                            }
+
+                            let closest_crystal = red_crystal_positions
+                                .iter()
+                                .min_by_key(|pos| {
+                                    let dx = pos.x - current_cell.x;
+                                    let dy = pos.y - current_cell.y;
+                                    dx * dx + dy * dy
+                                })
+                                .copied();
+
+                            if let Some(target_pos) = closest_crystal {
+                                let adjacent_cells = get_adjacent_cells(target_pos);
+                                let accessible_adjacent = adjacent_cells
+                                    .iter()
+                                    .filter(|pos| knowledge.discovered_empty.contains(pos))
+                                    .min_by_key(|pos| {
+                                        let dx = pos.x - current_cell.x;
+                                        let dy = pos.y - current_cell.y;
+                                        dx * dx + dy * dy
+                                    });
+
+                                if let Some(&adjacent_pos) = accessible_adjacent {
+                                    let path = find_path(current_cell, adjacent_pos, &knowledge);
+
+                                    if !path.is_empty() {
+                                        let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                            entity: robot_entity,
+                                            new_target: path[0],
+                                            is_moving: true,
+                                            current_task: MinerTask::MovingToTarget,
+                                        });
+                                    } else {
+                                        let path_to_crystal = find_partial_path(current_cell, target_pos, &knowledge);
+                                        if !path_to_crystal.is_empty() {
+                                            let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                                entity: robot_entity,
+                                                new_target: path_to_crystal[0],
+                                                is_moving: true,
+                                                current_task: MinerTask::MovingToTarget,
+                                            });
+                                        }
+                                    }
+                                } else {
+                                    let path_to_crystal = find_partial_path(current_cell, target_pos, &knowledge);
+                                    if !path_to_crystal.is_empty() {
+                                        let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                            entity: robot_entity,
+                                            new_target: path_to_crystal[0],
+                                            is_moving: true,
+                                            current_task: MinerTask::MovingToTarget,
+                                        });
+                                    }
+                                }
+                            }
+                        },
+                        MinerTask::Mining => {
+                            // check_miner_collection
+                        },
+                        MinerTask::ReturningToSpawn => {
+                            if current_cell == robot_data.spawn_position {
+                                let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                    entity: robot_entity,
+                                    new_target: current_cell,
+                                    is_moving: false,
+                                    current_task: MinerTask::Idle,
+                                });
+                                continue;
+                            }
+
+                            let path = find_path(current_cell, robot_data.spawn_position, &knowledge);
+                            if !path.is_empty() {
+                                let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                    entity: robot_entity,
+                                    new_target: path[0],
+                                    is_moving: true,
+                                    current_task: MinerTask::ReturningToSpawn,
+                                });
+                            } else {
+                                let partial_path = find_partial_path(current_cell, robot_data.spawn_position, &knowledge);
+                                if !partial_path.is_empty() {
+                                    let _ = result_sender.send(RobotResult::MinerMovementPlan {
+                                        entity: robot_entity,
+                                        new_target: partial_path[0],
+                                        is_moving: true,
+                                        current_task: MinerTask::ReturningToSpawn,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                },
+                RobotCommand::Shutdown => {
+                    info!("Robot thread received shutdown command");
+                    continue_running = false;
+                }
+            },
+            Err(_) => {
+                // Timeout
+            }
+        }
+    }
+
+    info!("Robot processing thread shutting down");
+}
+
+fn sync_world_knowledge(
+    world_knowledge_res: Res<WorldKnowledge>,
+    thread_manager: Res<RobotThreadManager>,
+) {
+    let knowledge_arc = Arc::new((*world_knowledge_res).clone());
+
+    let _ = thread_manager.command_sender.send(RobotCommand::UpdateWorldKnowledge(knowledge_arc));
+}
+
+fn send_robot_commands(
+    explorer_query: Query<(Entity, &Transform, &ExplorerRobot)>,
+    miner_query: Query<(Entity, &Transform, &MinerRobot)>,
+    thread_manager: Res<RobotThreadManager>,
+    time: Res<Time>,
+) {
+    for (entity, transform, robot) in explorer_query.iter() {
+        let current_cell_x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
+        let current_cell_y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
+        let current_cell = IVec2::new(current_cell_x, current_cell_y);
+
+        let _ = thread_manager.command_sender.send(RobotCommand::PlanExplorerMovement {
+            robot_entity: entity,
+            position: current_cell,
+            robot_data: robot.clone(),
+            delta_time: time.delta_secs(),
+        });
+    }
+
+    for (entity, transform, robot) in miner_query.iter() {
+        let current_cell_x = (transform.translation.x / CELL_SIZE as f32).round() as i32;
+        let current_cell_y = (transform.translation.y / CELL_SIZE as f32).round() as i32;
+        let current_cell = IVec2::new(current_cell_x, current_cell_y);
+
+        let _ = thread_manager.command_sender.send(RobotCommand::PlanMinerMovement {
+            robot_entity: entity,
+            position: current_cell,
+            robot_data: robot.clone(),
+            delta_time: time.delta_secs(),
+        });
+    }
+}
+
+fn process_robot_results(
+    mut explorer_query: Query<&mut ExplorerRobot>,
+    mut miner_query: Query<&mut MinerRobot>,
+    thread_manager: Res<RobotThreadManager>,
+) {
+    while let Ok(result) = thread_manager.result_receiver.try_recv() {
+        match result {
+            RobotResult::ExplorerMovementPlan { entity, new_target, is_moving, previous_position, follow_direction } => {
+                if let Ok(mut robot) = explorer_query.get_mut(entity) {
+                    robot.target_position = new_target;
+                    robot.is_moving = is_moving;
+                    robot.move_timer = 0.0;
+                    robot.previous_position = previous_position;
+                    robot.follow_direction = follow_direction;
+                }
+            },
+            RobotResult::MinerMovementPlan { entity, new_target, is_moving, current_task } => {
+                if let Ok(mut robot) = miner_query.get_mut(entity) {
+                    robot.target_position = new_target;
+                    robot.is_moving = is_moving;
+                    robot.move_timer = 0.0;
+                    robot.current_task = current_task;
+                }
+            }
+        }
+    }
+}
+
+fn shutdown_robot_threads(thread_manager: Res<RobotThreadManager>) {
+    info!("Shutting down robot threads");
+    let _ = thread_manager.command_sender.send(RobotCommand::Shutdown);
 }
 
 /// Spawns an explorer robot at a random position on the terrain, near the center of the map and
